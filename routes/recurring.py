@@ -72,9 +72,7 @@ def create_recurring(
     db.commit()
     db.refresh(rec)
 
-    out = RecurringTransactionRead.model_validate(rec, from_attributes=True)
-    out.kind = payload.kind
-    return out
+    return RecurringTransactionRead.model_validate(rec, from_attributes=True)
 
 
 @router.get("", response_model=list[RecurringTransactionRead])

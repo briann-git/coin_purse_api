@@ -75,9 +75,7 @@ def create_transaction(user_id: UUID, payload: TransactionCreate, db: Annotated[
     db.commit()
     db.refresh(txn)
 
-    out = TransactionRead.model_validate(txn, from_attributes=True)
-    out.kind = payload.kind  # convenience
-    return out
+    return TransactionRead.model_validate(txn, from_attributes=True)
 
 
 @router.get("", response_model=list[TransactionRead])

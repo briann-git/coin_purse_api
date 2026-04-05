@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from .common import APIModel, ReadBase
 
@@ -66,11 +66,14 @@ class TransactionRead(ReadBase):
     user_id: uuid.UUID
 
     kind_id: uuid.UUID
-    kind: str  # resolved from TransactionKind relationship
+    kind: str
 
     account_id: uuid.UUID
+    account_name: str
     to_account_id: uuid.UUID | None = None
+    to_account_name: str | None = None
     category_id: uuid.UUID | None = None
+    category_name: str | None = None
 
     amount: Decimal
     description: str | None = None
@@ -79,10 +82,28 @@ class TransactionRead(ReadBase):
     refunded_transaction_id: uuid.UUID | None = None
     transfer_group_id: uuid.UUID | None = None
 
-    @field_validator("kind", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def resolve_kind(cls, v):
-        """Accept either a plain string or a TransactionKind ORM object."""
-        if isinstance(v, str):
-            return v
-        return v.name  # TransactionKind.name
+    def _resolve_names(cls, data):
+        if isinstance(data, dict):
+            return data
+        return {
+            "id": data.id,
+            "created_at": data.created_at,
+            "updated_at": data.updated_at,
+            "is_active": data.is_active,
+            "user_id": data.user_id,
+            "kind_id": data.kind_id,
+            "kind": data.kind.name if data.kind else "",
+            "account_id": data.account_id,
+            "account_name": data.account.name if data.account else "",
+            "to_account_id": data.to_account_id,
+            "to_account_name": data.to_account.name if data.to_account else None,
+            "category_id": data.category_id,
+            "category_name": data.category.name if data.category else None,
+            "amount": data.amount,
+            "description": data.description,
+            "posted_at": data.posted_at,
+            "refunded_transaction_id": data.refunded_transaction_id,
+            "transfer_group_id": data.transfer_group_id,
+        }

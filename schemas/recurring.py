@@ -72,8 +72,11 @@ class RecurringTransactionRead(ReadBase):
     kind: str
 
     account_id: uuid.UUID
+    account_name: str
     to_account_id: uuid.UUID | None = None
+    to_account_name: str | None = None
     category_id: uuid.UUID | None = None
+    category_name: str | None = None
 
     amount: Decimal
     description: str | None = None
@@ -81,3 +84,29 @@ class RecurringTransactionRead(ReadBase):
     cadence: str
     next_run_date: date
     end_date: date | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_names(cls, data):
+        if isinstance(data, dict):
+            return data
+        return {
+            "id": data.id,
+            "created_at": data.created_at,
+            "updated_at": data.updated_at,
+            "is_active": data.is_active,
+            "user_id": data.user_id,
+            "kind_id": data.kind_id,
+            "kind": data.kind.name if data.kind else "",
+            "account_id": data.account_id,
+            "account_name": data.account.name if data.account else "",
+            "to_account_id": data.to_account_id,
+            "to_account_name": data.to_account.name if data.to_account else None,
+            "category_id": data.category_id,
+            "category_name": data.category.name if data.category else None,
+            "amount": data.amount,
+            "description": data.description,
+            "cadence": data.cadence,
+            "next_run_date": data.next_run_date,
+            "end_date": data.end_date,
+        }

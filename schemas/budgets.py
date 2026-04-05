@@ -55,4 +55,21 @@ class BudgetItemUpdate(APIModel):
 class BudgetItemRead(ReadBase):
     budget_id: uuid.UUID
     category_id: uuid.UUID
+    category_name: str
     limit_amount: Decimal
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_names(cls, data):
+        if isinstance(data, dict):
+            return data
+        return {
+            "id": data.id,
+            "created_at": data.created_at,
+            "updated_at": data.updated_at,
+            "is_active": data.is_active,
+            "budget_id": data.budget_id,
+            "category_id": data.category_id,
+            "category_name": data.category.name if data.category else "",
+            "limit_amount": data.limit_amount,
+        }
