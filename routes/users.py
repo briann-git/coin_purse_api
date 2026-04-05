@@ -4,11 +4,10 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-
 # NOTE: You should hash passwords in a proper auth service.
 # This is a minimal placeholder so you can start building the app.
-from passlib.context import CryptContext
+import bcrypt
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
@@ -16,13 +15,11 @@ from helpers.db_utils import active_query, get_active_or_404, soft_delete
 from models.models import User
 from schemas.users import UserCreate, UserRead, UserUpdate
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)

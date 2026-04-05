@@ -12,8 +12,11 @@ def active_query(db: Session, model: type[T]):
     # eg accounts = active_query(db, Account).all() instead of db.query(Account).all()
 
 
-def get_active_or_404(db: Session, model: type[T], obj_id):
-    return active_query(db, model).filter(model.id == obj_id).first()
+def get_active_or_404(db: Session, model: type[T], obj_id, *, detail: str = "Not found"):
+    obj = active_query(db, model).filter(model.id == obj_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail=detail)
+    return obj
 
 
 def require_owned_active(db: Session, model, obj_id: UUID, user_id: UUID, *, detail: str):

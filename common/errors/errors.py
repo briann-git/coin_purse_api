@@ -40,10 +40,18 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(_request: Request, exc: RequestValidationError):
+        # exc.errors() may contain ctx={"error": <ValueError>} which isn't JSON-serialisable.
+        # Convert the ctx value to its string representation so the response stays clean.
+        safe_errors = []
+        for err in exc.errors():
+            safe_err = dict(err)
+            if "ctx" in safe_err and isinstance(safe_err["ctx"], dict):
+                safe_err["ctx"] = {k: str(v) for k, v in safe_err["ctx"].items()}
+            safe_errors.append(safe_err)
         payload = ErrorResponse(
             error="validation_error",
             message="Request validation failed",
-            details=exc.errors(),
+            details=safe_errors,
         )
         return JSONResponse(status_code=422, content=payload.model_dump(mode="json"))
 

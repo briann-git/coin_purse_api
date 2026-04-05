@@ -59,4 +59,5 @@ strict = false
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.15.9"
 mypy = "^1.20.0"
+pytest = "^9.0.2"
 
