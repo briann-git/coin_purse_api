@@ -1,69 +1,106 @@
+# routes/budget_items.py
+from __future__ import annotations
 
+from typing import Annotated
+from uuid import UUID
 
-from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
-from models.models import BudgetItem
-from schemas.budget_items import BudgetItemCreate, BudgetItemUpdate, BudgetItemOut  # Assuming you have these schemas defined
+from helpers.db_utils import active_query, require_owned_active, soft_delete
+from models.models import Budget, BudgetItem, Category
+from schemas.budgets import BudgetItemCreate, BudgetItemRead, BudgetItemUpdate
 
-budget_items_router = APIRouter(
-    prefix="/budget_items",
-    tags=["budget_items"],
-    responses={404: {"description": "Not found"}},
-)
+router = APIRouter(prefix="/users/{user_id}/budgets/{budget_id}/items", tags=["budget-items"])
 
 
-# Generate crud endpoints for budget_item model
-@budget_items_router.get("", response_model=List[BudgetItemOut])
-def get_budget_items(db: Session = Depends(get_db)):  # Assuming you have a session dependency
+def _require_budget(db: Session, user_id: UUID, budget_id: UUID):
+    return require_owned_active(db, Budget, budget_id, user_id, detail="Budget not found")
 
-    budget_items = db.query(BudgetItem).all()
-    if not budget_items:
-        return {"message": "No budget_items found"}
-    return {"success": True, "budget_items": budget_items}
 
-@budget_items_router.get("/{budget_item_id}", response_model=BudgetItemOut)
-def get_budget_item(budget_item_id: int, db: Session = Depends(get_db)):
-    budget_item = db.query(BudgetItem).filter(BudgetItem.id == budget_item_id).first()
-    if not budget_item:
-        return {"message": "budget_item not found"}
-    return budget_item
+def _require_category(db: Session, user_id: UUID, category_id: UUID):
+    return require_owned_active(db, Category, category_id, user_id, detail="Category not found")
 
-@budget_items_router.post("", response_model=BudgetItemOut)
-def create_budget_item(budget_item: BudgetItemCreate, db: Session = Depends(get_db)):
-    db.add(BudgetItem(**budget_item.dict()))
+
+@router.post("", response_model=BudgetItemRead, status_code=status.HTTP_201_CREATED)
+def create_budget_item(
+    user_id: UUID,
+    budget_id: UUID,
+    payload: BudgetItemCreate,
+    db: Annotated[Session, Depends(get_db)],
+):
+    _require_budget(db, user_id, budget_id)
+    _require_category(db, user_id, payload.category_id)
+
+    item = BudgetItem(
+        budget_id=budget_id,
+        category_id=payload.category_id,
+        limit_amount=payload.limit_amount,
+    )
+    db.add(item)
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Budget item already exists for this category.") from exc
+    db.refresh(item)
+    return item
+
+
+@router.get("", response_model=list[BudgetItemRead])
+def list_budget_items(user_id: UUID, budget_id: UUID, db: Annotated[Session, Depends(get_db)]):
+    _require_budget(db, user_id, budget_id)
+    return active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id).all()
+
+
+@router.get("/{item_id}", response_model=BudgetItemRead)
+def get_budget_item(
+    user_id: UUID,
+    budget_id: UUID,
+    item_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+):
+    _require_budget(db, user_id, budget_id)
+    item = active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Budget item not found")
+    return item
+
+
+@router.patch("/{item_id}", response_model=BudgetItemRead)
+def update_budget_item(
+    user_id: UUID,
+    budget_id: UUID,
+    item_id: UUID,
+    payload: BudgetItemUpdate,
+    db: Annotated[Session, Depends(get_db)],
+):
+    _require_budget(db, user_id, budget_id)
+    item = active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Budget item not found")
+
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(item, k, v)
+
     db.commit()
-    db.refresh(budget_item)
-    budget_item = db.query(BudgetItem).filter(BudgetItem.email == budget_item.email).first()
-    if not budget_item:
-        return {"message": "budget_item creation failed"}
-    return budget_item
+    db.refresh(item)
+    return item
 
 
-@budget_items_router.put("/{budget_item_id}", response_model=BudgetItemOut)
-def update_budget_item(budget_item_id: int, budget_item: BudgetItemUpdate, db: Session = Depends(get_db)):
-    existing_budget_item = db.query(BudgetItem).filter(BudgetItem.id == budget_item_id).first()
-    if not existing_budget_item:
-        return {"message": "budget_item not found"}
-    for key, value in budget_item.items():
-        setattr(existing_budget_item, key, value)
-    db.commit()
-    db.refresh(existing_budget_item)
-    budget_item = db.query(BudgetItem).filter(BudgetItem.id == budget_item_id).first()
-    if not budget_item:
-        return {"message": "budget_item update failed"}
-    return budget_item
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_budget_item(
+    user_id: UUID,
+    budget_id: UUID,
+    item_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+):
+    _require_budget(db, user_id, budget_id)
+    item = active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Budget item not found")
 
-
-@budget_items_router.delete("/{budget_item_id}", response_model=dict)
-def delete_budget_item(budget_item_id: int, db: Session = Depends(get_db)):
-    budget_item = db.query(BudgetItem).filter(BudgetItem.id == budget_item_id).first()
-    if not budget_item:
-        return {"message": "budget_item not found"}
-    db.delete(budget_item)
-    db.commit()
-    return {"message": f"budget_item with ID {budget_item_id} deleted"}
-
-
+    deleted = soft_delete(db, BudgetItem, item_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Budget item not found")

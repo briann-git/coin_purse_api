@@ -1,13 +1,13 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from common.db import Base
-# Import the Base metadata from your models
-from models.models import User, BudgetItemType, BudgetItem, MonthlyBudgetItem
 
+# Import the Base metadata from your models
+# from models.models import User, BudgetItemType, BudgetItem, MonthlyBudgetItem
+from models.models import *
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

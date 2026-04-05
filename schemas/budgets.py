@@ -1,0 +1,58 @@
+# schemas/budgets.py
+from __future__ import annotations
+
+import uuid
+from datetime import date
+from decimal import Decimal
+
+from pydantic import Field, model_validator
+
+from .common import APIModel, ReadBase
+
+
+class BudgetCreate(APIModel):
+    name: str = Field(min_length=1, max_length=200)
+    period_start: date
+    period_end: date
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.period_end < self.period_start:
+            raise ValueError("period_end must be >= period_start")
+        return self
+
+
+class BudgetUpdate(APIModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    period_start: date | None = None
+    period_end: date | None = None
+    is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.period_start and self.period_end and self.period_end < self.period_start:
+            raise ValueError("period_end must be >= period_start")
+        return self
+
+
+class BudgetRead(ReadBase):
+    user_id: uuid.UUID
+    name: str
+    period_start: date
+    period_end: date
+
+
+class BudgetItemCreate(APIModel):
+    category_id: uuid.UUID
+    limit_amount: Decimal = Field(ge=0)
+
+
+class BudgetItemUpdate(APIModel):
+    limit_amount: Decimal | None = Field(default=None, ge=0)
+    is_active: bool | None = None
+
+
+class BudgetItemRead(ReadBase):
+    budget_id: uuid.UUID
+    category_id: uuid.UUID
+    limit_amount: Decimal

@@ -1,68 +1,85 @@
+# routes/users.py
+from __future__ import annotations
 
-
-from typing import List
+from typing import Annotated
 from uuid import UUID
-from fastapi import APIRouter, Depends
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+# NOTE: You should hash passwords in a proper auth service.
+# This is a minimal placeholder so you can start building the app.
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
+from helpers.db_utils import active_query, get_active_or_404, soft_delete
 from models.models import User
-from schemas.users import UserCreate, UserUpdate, UserOut  # Assuming you have these schemas defined
+from schemas.users import UserCreate, UserRead, UserUpdate
 
-users_router = APIRouter(
-    prefix="/users",
-    tags=["users"],
-    responses={404: {"description": "Not found"}},
-)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+router = APIRouter(prefix="/users", tags=["users"])
 
 
-# Generate crud endpoints for User model
-@users_router.get("", response_model=List[UserOut])  # Assuming you have a UserOut schema defined
-def get_users(db: Session = Depends(get_db)):  # Assuming you have a session dependency
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
 
-    users = db.query(User).all()
-    if not users:
-        return {"message": "No users found"}
-    return users
 
-@users_router.get("/{user_id}", response_model=UserOut)
-def get_user(user_id: UUID, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        return {"message": "User not found"}
+@router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def create_user(payload: UserCreate, db: Annotated[Session, Depends(get_db)]):
+    user = User(
+        name=payload.name,
+        email=str(payload.email),
+        phone=payload.phone,
+        password_hash=hash_password(payload.password),
+    )
+
+    print("user:", user)
+    db.add(user)
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Could not create user (maybe duplicate email/phone).",
+        ) from exc
+    db.refresh(user)
+    print("created user:", user)
     return user
 
-@users_router.post("", response_model=UserOut)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    print("Creating user:", user.dict())
-    user_obj = User(**user.dict())
-    db.add(user_obj)
-    db.commit()
-    db.refresh(user_obj)
-    if not user_obj:
-        return {"message": "User creation failed"}
-    return user_obj
+
+@router.get("", response_model=list[UserRead])
+def list_users(db: Annotated[Session, Depends(get_db)]):
+    return active_query(db, User).order_by(User.created_at.desc()).all()
 
 
-
-@users_router.put("/{user_id}", response_model=UserOut)
-def update_user(user_id: UUID, user: UserUpdate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.id == user_id).first()
-    if not existing_user:
-        return {"message": "User not found"}
-    for key, value in user.dict().items():
-        setattr(existing_user, key, value)
-    db.commit()
-    db.refresh(existing_user)
-    return existing_user
+@router.get("/{user_id}", response_model=UserRead)
+def get_user(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
+    return get_active_or_404(db, User, user_id, detail="User not found")
 
 
-@users_router.delete("/{user_id}", response_model=dict)
-def delete_user(user_id: UUID, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        return {"message": "User not found"}
-    db.delete(user)
-    db.commit()
-    return {"message": f"User with ID {user_id} deleted"}
-# Include the users router in the main application
+@router.patch("/{user_id}", response_model=UserRead)
+def update_user(user_id: UUID, payload: UserUpdate, db: Annotated[Session, Depends(get_db)]):
+    user = get_active_or_404(db, User, user_id, detail="User not found")
+
+    data = payload.model_dump(exclude_unset=True)
+
+    # For now, we allow name/phone updates only (per schema)
+    for k, v in data.items():
+        setattr(user, k, v)
+
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not update user (maybe duplicate phone).") from exc
+    db.refresh(user)
+    return user
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_user(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
+    deleted = soft_delete(db, User, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User not found")

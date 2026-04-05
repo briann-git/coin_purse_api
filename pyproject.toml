@@ -11,10 +11,51 @@ dependencies = [
     "fastapi[standard] (>=0.115.12,<0.116.0)",
     "uvicorn[standard] (>=0.34.3,<0.35.0)",
     "sqlalchemy (>=2.0.41,<3.0.0)",
-    "alembic (>=1.16.1,<2.0.0)"
+    "alembic (>=1.16.1,<2.0.0)",
+    "passlib[bcrypt] (>=1.7.4,<2.0.0)"
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+exclude = ["alembic"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN",    # type annotations not enforced yet
+    "D",      # docstrings
+    "ERA",    # commented-out code
+    "FIX",    # fixme markers
+    "TD",     # todo markers
+    "T20",    # print statements (dev convenience)
+    "TRY003", # exception message style
+    "EM101",  # exception string literal style
+    "TC001",  # typing-only first-party imports
+    "TC002",  # typing-only third-party imports
+    "TC003",  # typing-only stdlib imports
+    "S101",   # use of assert
+    "COM812", # trailing comma (conflicts with formatter)
+    "ISC001", # implicit string concat (conflicts with formatter)
+    "PLR0913", # too many function arguments (normal for FastAPI routes)
+    "PLR2004", # magic value comparisons (HTTP status codes are self-documenting)
+    "PLR0911", # too many return statements (complex route/dashboard functions)
+    "S104",   # binding to all interfaces (expected for server entrypoint)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/*" = ["ALL"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+strict = false
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.15.9"
+mypy = "^1.20.0"
+

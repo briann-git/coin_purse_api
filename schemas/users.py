@@ -1,23 +1,25 @@
-from typing import Optional
-from uuid import UUID, uuid4
-from pydantic import BaseModel, EmailStr
+from __future__ import annotations
+
+from pydantic import EmailStr, Field
+
+from .common import APIModel, ReadBase
 
 
-class UserBase(BaseModel):
+class UserCreate(APIModel):
+    name: str = Field(min_length=1, max_length=200)
+    email: EmailStr
+    phone: str | None = Field(default=None, max_length=50)
+    password: str = Field(min_length=8, max_length=1024)  # plain input; you hash server-side
+
+
+class UserUpdate(APIModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    phone: str | None = Field(default=None, max_length=50)
+    # email update typically requires verification; omit unless you want it
+
+
+class UserRead(ReadBase):
     name: str
     email: EmailStr
-    phone_number: Optional[str]
-
-    class Config:
-        orm_mode = True
-
-class UserCreate(UserBase):
-    pass
-
-class UserUpdate(BaseModel):
-    name: Optional[str]
-    email: Optional[EmailStr]
-    phone_number: Optional[str]
-
-class UserOut(UserBase):
-    id: UUID
+    phone: str | None = None
+    # never expose password_hash

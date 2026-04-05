@@ -1,8 +1,5 @@
-
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from common.db import Base
-
+from sqlalchemy.orm import sessionmaker
 
 engine = create_engine(
     "sqlite:///./budget_app.db",
@@ -12,9 +9,9 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-
-
 print("Database and tables created successfully.")
+
+
 def get_db():
     db = SessionLocal()
     try:
