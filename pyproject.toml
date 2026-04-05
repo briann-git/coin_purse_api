@@ -42,6 +42,7 @@ ignore = [
     "COM812", # trailing comma (conflicts with formatter)
     "ISC001", # implicit string concat (conflicts with formatter)
     "PLR0913", # too many function arguments (normal for FastAPI routes)
+    "PLR0915", # too many statements (seed/setup functions are intentionally long)
     "PLR2004", # magic value comparisons (HTTP status codes are self-documenting)
     "PLR0911", # too many return statements (complex route/dashboard functions)
     "S104",   # binding to all interfaces (expected for server entrypoint)
