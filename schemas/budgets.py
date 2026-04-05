@@ -54,6 +54,7 @@ class BudgetItemUpdate(APIModel):
 
 class BudgetItemRead(ReadBase):
     budget_id: uuid.UUID
+    budget_name: str
     category_id: uuid.UUID
     category_name: str
     limit_amount: Decimal
@@ -69,6 +70,7 @@ class BudgetItemRead(ReadBase):
             "updated_at": data.updated_at,
             "is_active": data.is_active,
             "budget_id": data.budget_id,
+            "budget_name": data.budget.name if data.budget else "",
             "category_id": data.category_id,
             "category_name": data.category.name if data.category else "",
             "limit_amount": data.limit_amount,

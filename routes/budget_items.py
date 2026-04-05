@@ -13,6 +13,7 @@ from models.models import Budget, BudgetItem, Category
 from schemas.budgets import BudgetItemCreate, BudgetItemRead, BudgetItemUpdate
 
 router = APIRouter(prefix="/users/{user_id}/budgets/{budget_id}/items", tags=["budget-items"])
+flat_router = APIRouter(prefix="/users/{user_id}/budget-items", tags=["budget-items"])
 
 
 def _require_budget(db: Session, user_id: UUID, budget_id: UUID):
@@ -104,3 +105,63 @@ def deactivate_budget_item(
     deleted = soft_delete(db, BudgetItem, item_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Budget item not found")
+
+
+# ---------------------------------------------------------------------------
+# Flat routes — budget_id is an optional query filter, not a path requirement
+# ---------------------------------------------------------------------------
+
+
+def _require_owned_item(db: Session, user_id: UUID, item_id: UUID) -> BudgetItem:
+    """Fetch a BudgetItem and verify it belongs to a budget owned by user_id."""
+    item = (
+        active_query(db, BudgetItem)
+        .join(Budget, Budget.id == BudgetItem.budget_id)
+        .filter(BudgetItem.id == item_id, Budget.user_id == user_id, Budget.is_active.is_(True))
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Budget item not found")
+    return item
+
+
+@flat_router.get("", response_model=list[BudgetItemRead])
+def list_all_budget_items(
+    user_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    budget_id: UUID | None = None,
+):
+    q = (
+        active_query(db, BudgetItem)
+        .join(Budget, Budget.id == BudgetItem.budget_id)
+        .filter(Budget.user_id == user_id, Budget.is_active.is_(True))
+    )
+    if budget_id is not None:
+        q = q.filter(BudgetItem.budget_id == budget_id)
+    return q.all()
+
+
+@flat_router.get("/{item_id}", response_model=BudgetItemRead)
+def get_budget_item_flat(user_id: UUID, item_id: UUID, db: Annotated[Session, Depends(get_db)]):
+    return _require_owned_item(db, user_id, item_id)
+
+
+@flat_router.patch("/{item_id}", response_model=BudgetItemRead)
+def update_budget_item_flat(
+    user_id: UUID,
+    item_id: UUID,
+    payload: BudgetItemUpdate,
+    db: Annotated[Session, Depends(get_db)],
+):
+    item = _require_owned_item(db, user_id, item_id)
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(item, k, v)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@flat_router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_budget_item_flat(user_id: UUID, item_id: UUID, db: Annotated[Session, Depends(get_db)]):
+    _require_owned_item(db, user_id, item_id)
+    soft_delete(db, BudgetItem, item_id)
