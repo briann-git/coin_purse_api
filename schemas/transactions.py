@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .common import APIModel, ReadBase
 
@@ -66,7 +66,7 @@ class TransactionRead(ReadBase):
     user_id: uuid.UUID
 
     kind_id: uuid.UUID
-    kind: str  # populated via join in service layer if you like
+    kind: str  # resolved from TransactionKind relationship
 
     account_id: uuid.UUID
     to_account_id: uuid.UUID | None = None
@@ -78,3 +78,11 @@ class TransactionRead(ReadBase):
 
     refunded_transaction_id: uuid.UUID | None = None
     transfer_group_id: uuid.UUID | None = None
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def resolve_kind(cls, v):
+        """Accept either a plain string or a TransactionKind ORM object."""
+        if isinstance(v, str):
+            return v
+        return v.name  # TransactionKind.name
