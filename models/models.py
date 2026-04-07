@@ -242,7 +242,7 @@ class Budget(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
-    is_template: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    is_template: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("0"))
     source_budget_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("budgets.id", ondelete="SET NULL"),
