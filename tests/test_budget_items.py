@@ -54,7 +54,7 @@ def test_create_budget_item_returns_201(client: TestClient, user_id: str, budget
     assert "id" in data
 
 
-def test_create_budget_item_duplicate_category_returns_400(
+def test_create_budget_item_duplicate_category_returns_409(
     client: TestClient, user_id: str, budget: dict, category: dict
 ):
     client.post(
@@ -65,7 +65,7 @@ def test_create_budget_item_duplicate_category_returns_400(
         f"/users/{user_id}/budgets/{budget['id']}/items",
         json={"category_id": category["id"], "limit_amount": "200.00"},
     )
-    assert res.status_code == 400
+    assert res.status_code == 409
 
 
 def test_create_budget_item_unknown_budget_returns_404(client: TestClient, user_id: str, category: dict):

@@ -8,20 +8,31 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
-from helpers.db_utils import active_query, require_owned_active, soft_delete
+from helpers.db_utils import (
+    active_query,
+    get_or_reactivate,
+    require_owned_active,
+    soft_delete,
+)
 from models.models import Budget, BudgetItem, Category
 from schemas.budgets import BudgetItemCreate, BudgetItemRead, BudgetItemUpdate
 
-router = APIRouter(prefix="/users/{user_id}/budgets/{budget_id}/items", tags=["budget-items"])
+router = APIRouter(
+    prefix="/users/{user_id}/budgets/{budget_id}/items", tags=["budget-items"]
+)
 flat_router = APIRouter(prefix="/users/{user_id}/budget-items", tags=["budget-items"])
 
 
 def _require_budget(db: Session, user_id: UUID, budget_id: UUID):
-    return require_owned_active(db, Budget, budget_id, user_id, detail="Budget not found")
+    return require_owned_active(
+        db, Budget, budget_id, user_id, detail="Budget not found"
+    )
 
 
 def _require_category(db: Session, user_id: UUID, category_id: UUID):
-    return require_owned_active(db, Category, category_id, user_id, detail="Category not found")
+    return require_owned_active(
+        db, Category, category_id, user_id, detail="Category not found"
+    )
 
 
 @router.post("", response_model=BudgetItemRead, status_code=status.HTTP_201_CREATED)
@@ -34,23 +45,27 @@ def create_budget_item(
     _require_budget(db, user_id, budget_id)
     _require_category(db, user_id, payload.category_id)
 
-    item = BudgetItem(
-        budget_id=budget_id,
-        category_id=payload.category_id,
-        limit_amount=payload.limit_amount,
+    return get_or_reactivate(
+        db,
+        BudgetItem,
+        [
+            BudgetItem.budget_id == budget_id,
+            BudgetItem.category_id == payload.category_id,
+        ],
+        create=lambda: BudgetItem(
+            budget_id=budget_id,
+            category_id=payload.category_id,
+            limit_amount=payload.limit_amount,
+        ),
+        updates={"limit_amount": payload.limit_amount},
+        conflict_detail="Budget item already exists for this category.",
     )
-    db.add(item)
-    try:
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Budget item already exists for this category.") from exc
-    db.refresh(item)
-    return item
 
 
 @router.get("", response_model=list[BudgetItemRead])
-def list_budget_items(user_id: UUID, budget_id: UUID, db: Annotated[Session, Depends(get_db)]):
+def list_budget_items(
+    user_id: UUID, budget_id: UUID, db: Annotated[Session, Depends(get_db)]
+):
     _require_budget(db, user_id, budget_id)
     return active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id).all()
 
@@ -63,7 +78,11 @@ def get_budget_item(
     db: Annotated[Session, Depends(get_db)],
 ):
     _require_budget(db, user_id, budget_id)
-    item = active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id).first()
+    item = (
+        active_query(db, BudgetItem)
+        .filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id)
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Budget item not found")
     return item
@@ -78,7 +97,11 @@ def update_budget_item(
     db: Annotated[Session, Depends(get_db)],
 ):
     _require_budget(db, user_id, budget_id)
-    item = active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id).first()
+    item = (
+        active_query(db, BudgetItem)
+        .filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id)
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Budget item not found")
 
@@ -98,7 +121,11 @@ def deactivate_budget_item(
     db: Annotated[Session, Depends(get_db)],
 ):
     _require_budget(db, user_id, budget_id)
-    item = active_query(db, BudgetItem).filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id).first()
+    item = (
+        active_query(db, BudgetItem)
+        .filter(BudgetItem.budget_id == budget_id, BudgetItem.id == item_id)
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Budget item not found")
 
@@ -117,7 +144,11 @@ def _require_owned_item(db: Session, user_id: UUID, item_id: UUID) -> BudgetItem
     item = (
         active_query(db, BudgetItem)
         .join(Budget, Budget.id == BudgetItem.budget_id)
-        .filter(BudgetItem.id == item_id, Budget.user_id == user_id, Budget.is_active.is_(True))
+        .filter(
+            BudgetItem.id == item_id,
+            Budget.user_id == user_id,
+            Budget.is_active.is_(True),
+        )
         .first()
     )
     if not item:
@@ -142,7 +173,9 @@ def list_all_budget_items(
 
 
 @flat_router.get("/{item_id}", response_model=BudgetItemRead)
-def get_budget_item_flat(user_id: UUID, item_id: UUID, db: Annotated[Session, Depends(get_db)]):
+def get_budget_item_flat(
+    user_id: UUID, item_id: UUID, db: Annotated[Session, Depends(get_db)]
+):
     return _require_owned_item(db, user_id, item_id)
 
 
@@ -162,6 +195,8 @@ def update_budget_item_flat(
 
 
 @flat_router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_budget_item_flat(user_id: UUID, item_id: UUID, db: Annotated[Session, Depends(get_db)]):
+def delete_budget_item_flat(
+    user_id: UUID, item_id: UUID, db: Annotated[Session, Depends(get_db)]
+):
     _require_owned_item(db, user_id, item_id)
     soft_delete(db, BudgetItem, item_id)

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
-from helpers.db_utils import active_query, require_owned_active, soft_delete
+from helpers.db_utils import active_query, get_or_reactivate, require_owned_active, soft_delete
 from models.models import Budget
 from schemas.budgets import BudgetCreate, BudgetRead, BudgetUpdate
 
@@ -17,20 +17,22 @@ router = APIRouter(prefix="/users/{user_id}/budgets", tags=["budgets"])
 
 @router.post("", response_model=BudgetRead, status_code=status.HTTP_201_CREATED)
 def create_budget(user_id: UUID, payload: BudgetCreate, db: Annotated[Session, Depends(get_db)]):
-    budget = Budget(
-        user_id=user_id,
-        name=payload.name,
-        period_start=payload.period_start,
-        period_end=payload.period_end,
+    return get_or_reactivate(
+        db, Budget,
+        [
+            Budget.user_id == user_id,
+            Budget.period_start == payload.period_start,
+            Budget.period_end == payload.period_end,
+        ],
+        create=lambda: Budget(
+            user_id=user_id,
+            name=payload.name,
+            period_start=payload.period_start,
+            period_end=payload.period_end,
+        ),
+        updates={"name": payload.name},
+        conflict_detail="A budget for that period already exists.",
     )
-    db.add(budget)
-    try:
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Could not create budget (maybe duplicate period).") from exc
-    db.refresh(budget)
-    return budget
 
 
 @router.get("", response_model=list[BudgetRead])

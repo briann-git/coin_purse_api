@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
-from helpers.db_utils import active_query, require_owned_active, soft_delete
+from helpers.db_utils import active_query, get_or_reactivate, require_owned_active, soft_delete
 from models.models import Category
 from schemas.categories import CategoryCreate, CategoryRead, CategoryUpdate
 
@@ -17,15 +17,12 @@ router = APIRouter(prefix="/users/{user_id}/categories", tags=["categories"])
 
 @router.post("", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
 def create_category(user_id: UUID, payload: CategoryCreate, db: Annotated[Session, Depends(get_db)]):
-    cat = Category(user_id=user_id, name=payload.name)
-    db.add(cat)
-    try:
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Could not create category (maybe duplicate name).") from exc
-    db.refresh(cat)
-    return cat
+    return get_or_reactivate(
+        db, Category,
+        [Category.user_id == user_id, Category.name == payload.name],
+        create=lambda: Category(user_id=user_id, name=payload.name),
+        conflict_detail="Category already exists.",
+    )
 
 
 @router.get("", response_model=list[CategoryRead])
