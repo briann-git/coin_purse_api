@@ -35,7 +35,10 @@ def test_create_budget_end_before_start_returns_422(client: TestClient, user_id:
 
 
 def test_create_budget_name_defaults_to_month_year(client: TestClient, user_id: str):
-    res = client.post(f"/users/{user_id}/budgets", json={"period_start": "2026-06-01", "period_end": "2026-06-30"})
+    res = client.post(
+        f"/users/{user_id}/budgets",
+        json={"period_start": "2026-06-01", "period_end": "2026-06-30"},
+    )
     assert res.status_code == 201
     assert res.json()["name"] == "June 2026"
 
@@ -283,3 +286,31 @@ def test_clone_budget_invalid_period_returns_422(client: TestClient, user_id: st
         json={"period_start": "2026-05-31", "period_end": "2026-05-01"},
     )
     assert res.status_code == 422
+
+
+def test_clone_into_deleted_budget_period_reactivates(client: TestClient, user_id: str):
+    """Cloning into a soft-deleted budget's period should reactivate it, not error."""
+    budget, _ = _budget_with_items(client, user_id)
+    # Clone to May, then delete the clone
+    clone = client.post(
+        f"/users/{user_id}/budgets/{budget['id']}/clone", json=CLONE_PERIOD
+    ).json()
+    client.delete(f"/users/{user_id}/budgets/{clone['id']}")
+    # Clone again into the same (now deleted) period — should succeed
+    res = client.post(
+        f"/users/{user_id}/budgets/{budget['id']}/clone", json=CLONE_PERIOD
+    )
+    assert res.status_code == 201
+    assert res.json()["is_active"] is True
+    assert res.json()["period_start"] == CLONE_PERIOD["period_start"]
+
+
+def test_create_budget_reactivates_deleted(client: TestClient, user_id: str):
+    """Creating a budget for a soft-deleted period should reactivate it."""
+    client.post(f"/users/{user_id}/budgets", json=BUDGET_PAYLOAD)
+    client.delete(
+        f"/users/{user_id}/budgets/{client.get(f'/users/{user_id}/budgets').json()[0]['id']}"
+    )
+    res = client.post(f"/users/{user_id}/budgets", json=BUDGET_PAYLOAD)
+    assert res.status_code == 201
+    assert res.json()["is_active"] is True

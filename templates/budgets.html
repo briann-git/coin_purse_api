@@ -41,7 +41,7 @@
         <label class="text-xs text-slate-500">Start Date</label>
         <input id="create-period-start" name="period_start" type="date" required
                class="input-field" value="{{ default_start }}"
-               oninput="updateNamePlaceholder()" />
+               oninput="autoFillEndDate()" />
       </div>
       <div class="flex flex-col gap-1">
         <label class="text-xs text-slate-500">End Date</label>
@@ -240,21 +240,21 @@ function updateNamePlaceholder() {
   nameInput.placeholder = `${MONTHS[d.getMonth()]} ${d.getFullYear()} (auto)`;
 }
 
-function prefillDatesFromCloneSource() {
-  const sel = document.getElementById("create-clone-from");
-  const opt = sel.options[sel.selectedIndex];
-  if (!opt || !opt.value) return;  // blank — leave dates as-is
-  const cs = opt.dataset.cloneStart;
-  const ce = opt.dataset.cloneEnd;
-  if (cs) { document.getElementById("create-period-start").value = cs; updateNamePlaceholder(); }
-  if (ce) { document.getElementById("create-period-end").value = ce; }
+function autoFillEndDate() {
+  const startVal = document.getElementById("create-period-start").value;
+  if (!startVal) return;
+  const d = new Date(startVal + "T00:00:00");
+  // Last day of the same month
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const yyyy = lastDay.getFullYear();
+  const mm = String(lastDay.getMonth() + 1).padStart(2, "0");
+  const dd = String(lastDay.getDate()).padStart(2, "0");
+  document.getElementById("create-period-end").value = `${yyyy}-${mm}-${dd}`;
+  updateNamePlaceholder();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   updateNamePlaceholder();
-  document.getElementById("create-clone-from")?.addEventListener("change", prefillDatesFromCloneSource);
-  // Pre-fill dates from the initially-selected template option
-  prefillDatesFromCloneSource();
 });
 
 async function createBudget(e) {

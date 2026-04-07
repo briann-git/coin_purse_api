@@ -101,6 +101,35 @@ def deactivate_budget(
         raise HTTPException(status_code=404, detail="Budget not found")
 
 
+def _upsert_clone_items(db: Session, budget_id: UUID, source_items: list) -> None:
+    """Copy source_items into budget_id.
+
+    Reactivates + updates limit if a (budget_id, category_id) row already exists
+    (even if soft-deleted), otherwise inserts fresh.  This avoids hitting the
+    unique constraint when re-cloning into a previously soft-deleted budget.
+    """
+    for item in source_items:
+        existing = (
+            db.query(BudgetItem)
+            .filter(
+                BudgetItem.budget_id == budget_id,
+                BudgetItem.category_id == item.category_id,
+            )
+            .first()
+        )
+        if existing:
+            existing.is_active = True
+            existing.limit_amount = item.limit_amount
+        else:
+            db.add(
+                BudgetItem(
+                    budget_id=budget_id,
+                    category_id=item.category_id,
+                    limit_amount=item.limit_amount,
+                )
+            )
+
+
 @router.post(
     "/{budget_id}/clone", response_model=BudgetRead, status_code=status.HTTP_201_CREATED
 )
@@ -133,6 +162,19 @@ def clone_budget(
             status_code=409, detail="A budget for that period already exists."
         )
 
+    source_items = (
+        active_query(db, BudgetItem).filter(BudgetItem.budget_id == source.id).all()
+    )
+
+    if existing:  # soft-deleted — reactivate and re-clone into it
+        existing.is_active = True
+        existing.name = payload.name
+        existing.source_budget_id = source.id
+        _upsert_clone_items(db, existing.id, source_items)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     new_budget = Budget(
         user_id=user_id,
         name=payload.name,
@@ -142,19 +184,7 @@ def clone_budget(
     )
     db.add(new_budget)
     db.flush()  # get new_budget.id before inserting items
-
-    source_items = (
-        active_query(db, BudgetItem).filter(BudgetItem.budget_id == source.id).all()
-    )
-    for item in source_items:
-        db.add(
-            BudgetItem(
-                budget_id=new_budget.id,
-                category_id=item.category_id,
-                limit_amount=item.limit_amount,
-            )
-        )
-
+    _upsert_clone_items(db, new_budget.id, source_items)
     db.commit()
     db.refresh(new_budget)
     return new_budget
