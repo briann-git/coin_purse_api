@@ -314,3 +314,36 @@ def test_create_budget_reactivates_deleted(client: TestClient, user_id: str):
     res = client.post(f"/users/{user_id}/budgets", json=BUDGET_PAYLOAD)
     assert res.status_code == 201
     assert res.json()["is_active"] is True
+
+
+def test_reactivated_budget_clears_is_template(client: TestClient, user_id: str):
+    """Reactivating a previously-template budget via POST must not restore is_template."""
+    res = client.post(f"/users/{user_id}/budgets", json=BUDGET_PAYLOAD)
+    budget_id = res.json()["id"]
+    client.patch(f"/users/{user_id}/budgets/{budget_id}", json={"is_template": True})
+    assert (
+        client.get(f"/users/{user_id}/budgets/{budget_id}").json()["is_template"]
+        is True
+    )
+    client.delete(f"/users/{user_id}/budgets/{budget_id}")
+    res2 = client.post(f"/users/{user_id}/budgets", json=BUDGET_PAYLOAD)
+    assert res2.status_code == 201
+    assert res2.json()["is_template"] is False
+
+
+def test_clone_into_deleted_template_clears_is_template(client: TestClient, user_id: str):
+    """Cloning into a period that previously held a template must not restore is_template."""
+    budget, _ = _budget_with_items(client, user_id)
+    # Make the source budget a template, then delete it
+    client.patch(f"/users/{user_id}/budgets/{budget['id']}", json={"is_template": True})
+    client.delete(f"/users/{user_id}/budgets/{budget['id']}")
+    # Clone a different budget into the same period
+    other = client.post(
+        f"/users/{user_id}/budgets",
+        json={"period_start": "2026-03-01", "period_end": "2026-03-31"},
+    ).json()
+    res = client.post(
+        f"/users/{user_id}/budgets/{other['id']}/clone", json=BUDGET_PAYLOAD
+    )
+    assert res.status_code == 201
+    assert res.json()["is_template"] is False

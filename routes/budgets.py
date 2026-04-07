@@ -38,7 +38,7 @@ def create_budget(
             period_start=payload.period_start,
             period_end=payload.period_end,
         ),
-        updates={"name": payload.name},
+        updates={"name": payload.name, "is_template": False},
         conflict_detail="A budget for that period already exists.",
     )
 
@@ -170,6 +170,7 @@ def clone_budget(
         existing.is_active = True
         existing.name = payload.name
         existing.source_budget_id = source.id
+        existing.is_template = False
         _upsert_clone_items(db, existing.id, source_items)
         db.commit()
         db.refresh(existing)
