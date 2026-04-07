@@ -160,11 +160,12 @@ def ui_budgets(
         )
 
     # Trend data — non-template budgets in chronological order
+    trend_entries = [bd for bd in reversed(budget_data) if not bd["budget"].is_template]
     trend_data = []
-    for bd in reversed(budget_data):
+    cat_data: dict[str, list] = {}
+    n = len(trend_entries)
+    for i, bd in enumerate(trend_entries):
         b = bd["budget"]
-        if b.is_template:
-            continue
         total = sum(float(item.limit_amount) for item in bd["items"])
         trend_data.append(
             {
@@ -174,6 +175,13 @@ def ui_budgets(
                 "item_count": len(bd["items"]),
             }
         )
+        for item in bd["items"]:
+            if item.category_name not in cat_data:
+                cat_data[item.category_name] = [None] * n
+            cat_data[item.category_name][i] = float(item.limit_amount)
+    trend_labels = [t["name"] for t in trend_data]
+    trend_series = [{"name": cat, "data": cat_data[cat]} for cat in sorted(cat_data)]
+    trend_series.insert(0, {"name": "Total", "data": [t["total_limit"] for t in trend_data]})
     trend_stats: dict = {}
     if trend_data:
         totals = [t["total_limit"] for t in trend_data]
@@ -199,5 +207,7 @@ def ui_budgets(
             "template_budget_id": str(template_budget.id) if template_budget else "",
             "trend_data": trend_data,
             "trend_stats": trend_stats,
+            "trend_labels": trend_labels,
+            "trend_series": trend_series,
         },
     )
