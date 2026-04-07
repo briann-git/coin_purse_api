@@ -40,6 +40,7 @@ class BudgetRead(ReadBase):
     name: str
     period_start: date
     period_end: date
+    source_budget_id: uuid.UUID | None = None
 
 
 class BudgetItemCreate(APIModel):

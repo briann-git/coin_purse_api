@@ -48,14 +48,18 @@ class TimestampMixin:
         server_default=func.now(),
         onupdate=lambda: datetime.now(UTC),
     )
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
 
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
+    email: Mapped[str] = mapped_column(
+        String(320), nullable=False, unique=True, index=True
+    )
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -79,8 +83,12 @@ class Account(TimestampMixin, Base):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    account_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g. cash/bank/card/mobile_money
-    opening_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, server_default=text("0"))
+    account_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # e.g. cash/bank/card/mobile_money
+    opening_balance: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, server_default=text("0")
+    )
 
     user: Mapped[User] = relationship(back_populates="accounts")
     transactions: Mapped[list[Transaction]] = relationship(
@@ -101,7 +109,9 @@ class TransactionKind(TimestampMixin, Base):
 
     __tablename__ = "transaction_kinds"
 
-    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(
+        String(50), nullable=False, unique=True, index=True
+    )
 
     transactions: Mapped[list[Transaction]] = relationship(back_populates="kind")
     recurring: Mapped[list[RecurringTransaction]] = relationship(back_populates="kind")
@@ -191,7 +201,9 @@ class Transaction(TimestampMixin, Base):
     )
 
     # optional grouping for transfers (helps reporting/auditing)
-    transfer_group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    transfer_group_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
 
     user: Mapped[User] = relationship(back_populates="transactions")
     kind: Mapped[TransactionKind] = relationship(back_populates="transactions")
@@ -217,7 +229,9 @@ class Budget(TimestampMixin, Base):
     __tablename__ = "budgets"
     __table_args__ = (
         Index("ix_budgets_user_period", "user_id", "period_start", "period_end"),
-        UniqueConstraint("user_id", "period_start", "period_end", name="uq_budgets_user_period"),
+        UniqueConstraint(
+            "user_id", "period_start", "period_end", name="uq_budgets_user_period"
+        ),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -228,15 +242,27 @@ class Budget(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    source_budget_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("budgets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     user: Mapped[User] = relationship(back_populates="budgets")
-    items: Mapped[list[BudgetItem]] = relationship(back_populates="budget", cascade="all, delete-orphan")
+    items: Mapped[list[BudgetItem]] = relationship(
+        back_populates="budget", cascade="all, delete-orphan"
+    )
+    source_budget: Mapped[Budget | None] = relationship(
+        foreign_keys=[source_budget_id], remote_side="Budget.id"
+    )
 
 
 class BudgetItem(TimestampMixin, Base):
     __tablename__ = "budget_items"
     __table_args__ = (
-        UniqueConstraint("budget_id", "category_id", name="uq_budget_items_budget_category"),
+        UniqueConstraint(
+            "budget_id", "category_id", name="uq_budget_items_budget_category"
+        ),
         CheckConstraint("limit_amount >= 0", name="ck_budget_items_limit_nonneg"),
         Index("ix_budget_items_budget_id", "budget_id"),
     )
@@ -297,7 +323,9 @@ class RecurringTransaction(TimestampMixin, Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    cadence: Mapped[str] = mapped_column(String(30), nullable=False)  # weekly/monthly/etc.
+    cadence: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )  # weekly/monthly/etc.
     next_run_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
