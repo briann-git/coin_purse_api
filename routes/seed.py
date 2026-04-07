@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
-from helpers.seed_data import create_full_dev_seed, seed_transaction_kinds, seed_user_defaults
+from helpers.seed_data import create_full_dev_seed, seed_2025_budgets, seed_transaction_kinds, seed_user_defaults
 
 router = APIRouter(tags=["seed"])
 
@@ -42,3 +42,18 @@ def seed_user(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
     """Idempotent — skips anything that already exists."""
     result = seed_user_defaults(db, user_id)
     return {"message": "User defaults seeded", **result}
+
+
+@router.post(
+    "/users/{user_id}/seed/budgets-2025",
+    status_code=201,
+    summary="Seed 12 monthly budgets for 2025",
+)
+def seed_budgets_2025(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
+    """
+    Creates Jan-Dec 2025 budgets with standard category limits.
+    Idempotent — skips months that already have a budget.
+    Sets January 2025 as the template budget.
+    """
+    result = seed_2025_budgets(db, user_id)
+    return {"message": "2025 budgets seeded", **result}
