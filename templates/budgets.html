@@ -143,11 +143,6 @@
       </div>
       {# Action buttons — stopPropagation so they don't toggle the accordion #}
       <div class="flex items-center gap-2 shrink-0" onclick="event.stopPropagation()">
-        <button
-          onclick="cloneBudget('{{ b.id }}', '{{ bd.clone_start }}', '{{ bd.clone_end }}')"
-          class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium px-2.5 py-1 rounded-lg transition-colors">
-          Clone → {{ bd.clone_label }}
-        </button>
         {% if b.is_template %}
         <button
           onclick="unsetTemplate('{{ b.id }}')"
