@@ -1,6 +1,7 @@
 # schemas/budgets.py
 from __future__ import annotations
 
+import calendar
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -11,7 +12,7 @@ from .common import APIModel, ReadBase
 
 
 class BudgetCreate(APIModel):
-    name: str = Field(min_length=1, max_length=200)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
     period_start: date
     period_end: date
 
@@ -19,6 +20,8 @@ class BudgetCreate(APIModel):
     def validate_period(self):
         if self.period_end < self.period_start:
             raise ValueError("period_end must be >= period_start")
+        if not self.name:
+            self.name = f"{calendar.month_name[self.period_start.month]} {self.period_start.year}"
         return self
 
 
@@ -41,6 +44,20 @@ class BudgetRead(ReadBase):
     period_start: date
     period_end: date
     source_budget_id: uuid.UUID | None = None
+
+
+class BudgetClone(APIModel):
+    period_start: date
+    period_end: date
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.period_end < self.period_start:
+            raise ValueError("period_end must be >= period_start")
+        if not self.name:
+            self.name = f"{calendar.month_name[self.period_start.month]} {self.period_start.year}"
+        return self
 
 
 class BudgetItemCreate(APIModel):
