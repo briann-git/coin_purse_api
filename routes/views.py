@@ -155,6 +155,7 @@ def ui_budgets(
                 "clone_start": clone_start.isoformat(),
                 "clone_end": clone_end.isoformat(),
                 "clone_label": f"{cal_lib.month_name[nm]} {ny}",
+                "is_current": b.period_start <= today <= b.period_end,
             }
         )
 

@@ -76,7 +76,7 @@
   {% endif %}
 
   {# Accordion card #}
-  <div id="budget-{{ b.id }}" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+  <div id="budget-{{ b.id }}" class="bg-white rounded-xl shadow-sm border overflow-hidden {% if bd.is_current %}border-emerald-400{% else %}border-slate-200{% endif %}">
 
     {# Clickable header row — always visible #}
     <div class="px-5 py-3 flex items-center justify-between gap-3 cursor-pointer select-none
@@ -91,6 +91,9 @@
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-semibold text-slate-800 truncate">{{ b.name }}</span>
+            {% if bd.is_current %}
+            <span class="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full shrink-0">● Current</span>
+            {% endif %}
             {% if b.is_template %}
             <span class="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full shrink-0">⭐ Template</span>
             {% endif %}
@@ -271,6 +274,9 @@ function autoFillEndDate() {
 
 document.addEventListener("DOMContentLoaded", () => {
   updateNamePlaceholder();
+  {% for bd in budgets %}{% if bd.is_current %}
+  toggleCard("{{ bd.budget.id }}");
+  {% endif %}{% endfor %}
 });
 
 async function createBudget(e) {
