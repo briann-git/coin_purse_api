@@ -30,6 +30,7 @@ class BudgetUpdate(APIModel):
     period_start: date | None = None
     period_end: date | None = None
     is_active: bool | None = None
+    is_template: bool | None = None
 
     @model_validator(mode="after")
     def validate_period(self):
@@ -43,6 +44,7 @@ class BudgetRead(ReadBase):
     name: str
     period_start: date
     period_end: date
+    is_template: bool = False
     source_budget_id: uuid.UUID | None = None
 
 

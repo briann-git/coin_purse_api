@@ -70,7 +70,15 @@ def update_budget(
     budget = require_owned_active(
         db, Budget, budget_id, user_id, detail="Budget not found"
     )
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    # Enforce single template per user — clear others before setting this one
+    if updates.get("is_template") is True:
+        db.query(Budget).filter(
+            Budget.user_id == user_id,
+            Budget.id != budget_id,
+            Budget.is_template.is_(True),
+        ).update({"is_template": False})
+    for k, v in updates.items():
         setattr(budget, k, v)
     try:
         db.commit()

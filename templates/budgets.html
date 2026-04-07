@@ -22,6 +22,22 @@
   <div class="px-5 py-4 bg-slate-50">
     <form id="budget-form" class="flex flex-wrap gap-4 items-end" onsubmit="createBudget(event)">
       <div class="flex flex-col gap-1">
+        <label class="text-xs text-slate-500">Clone items from</label>
+        <select id="create-clone-from" name="clone_from" class="input-field min-w-[200px]">
+          <option value="">— blank budget —</option>
+          {% for bd in budgets %}
+          {% set b = bd.budget %}
+          <option value="{{ b.id }}"
+            data-clone-start="{{ bd.clone_start }}"
+            data-clone-end="{{ bd.clone_end }}"
+            {% if b.is_template %}data-is-template="true"{% endif %}
+            {% if b.id | string == template_budget_id %}selected{% endif %}>
+            {{ b.name }}{% if b.is_template %} ⭐{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex flex-col gap-1">
         <label class="text-xs text-slate-500">Start Date</label>
         <input id="create-period-start" name="period_start" type="date" required
                class="input-field" value="{{ default_start }}"
@@ -29,7 +45,7 @@
       </div>
       <div class="flex flex-col gap-1">
         <label class="text-xs text-slate-500">End Date</label>
-        <input name="period_end" type="date" required class="input-field" value="{{ default_end }}" />
+        <input id="create-period-end" name="period_end" type="date" required class="input-field" value="{{ default_end }}" />
       </div>
       <div class="flex flex-col gap-1 min-w-[180px]">
         <label class="text-xs text-slate-500">Name <span class="text-slate-400">(optional — defaults to month &amp; year)</span></label>
@@ -51,7 +67,12 @@
     <div class="px-5 py-4 border-b border-slate-100">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-sm font-semibold text-slate-800">{{ b.name }}</p>
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-sm font-semibold text-slate-800">{{ b.name }}</p>
+            {% if b.is_template %}
+            <span class="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">⭐ Template</span>
+            {% endif %}
+          </div>
           <p class="text-xs text-slate-400 mt-0.5">
             {{ b.period_start.strftime("%b %d, %Y") }} – {{ b.period_end.strftime("%b %d, %Y") }}
           </p>
@@ -71,6 +92,19 @@
             class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
             Clone → {{ bd.clone_label }}
           </button>
+          {% if b.is_template %}
+          <button
+            onclick="unsetTemplate('{{ b.id }}')"
+            class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+            ⭐ Template
+          </button>
+          {% else %}
+          <button
+            onclick="setTemplate('{{ b.id }}')"
+            class="text-xs text-slate-400 hover:text-amber-600 font-medium px-2 py-1.5 rounded-lg transition-colors">
+            Set as template
+          </button>
+          {% endif %}
           <button
             onclick="deleteBudget('{{ b.id }}')"
             class="text-xs text-rose-500 hover:text-rose-700 font-medium">
@@ -82,7 +116,7 @@
 
     {# Budget items #}
     <ul id="items-{{ b.id }}" class="divide-y divide-slate-100">
-      {% for item in bd.items %}
+      {% for item in bd['items'] %}
       <li id="bitem-{{ item.id }}" class="px-5 py-3 flex items-center justify-between gap-4">
         <p class="text-sm text-slate-700">{{ item.category_name }}</p>
         <div class="flex items-center gap-4">
@@ -95,7 +129,7 @@
         </div>
       </li>
       {% endfor %}
-      {% if not bd.items %}
+      {% if not bd['items'] %}
       <li id="items-empty-{{ b.id }}" class="px-5 py-3 text-sm text-slate-400">No items yet.</li>
       {% endif %}
     </ul>
@@ -172,20 +206,46 @@ function updateNamePlaceholder() {
   nameInput.placeholder = `${MONTHS[d.getMonth()]} ${d.getFullYear()} (auto)`;
 }
 
-document.addEventListener("DOMContentLoaded", updateNamePlaceholder);
+function prefillDatesFromCloneSource() {
+  const sel = document.getElementById("create-clone-from");
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;  // blank — leave dates as-is
+  const cs = opt.dataset.cloneStart;
+  const ce = opt.dataset.cloneEnd;
+  if (cs) { document.getElementById("create-period-start").value = cs; updateNamePlaceholder(); }
+  if (ce) { document.getElementById("create-period-end").value = ce; }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  updateNamePlaceholder();
+  document.getElementById("create-clone-from")?.addEventListener("change", prefillDatesFromCloneSource);
+  // Pre-fill dates from the initially-selected template option
+  prefillDatesFromCloneSource();
+});
 
 async function createBudget(e) {
   e.preventDefault();
   const fd = new FormData(e.target);
   const name = fd.get("name").trim();
-  const body = {
-    period_start: fd.get("period_start"),
-    period_end: fd.get("period_end"),
-  };
-  if (name) body.name = name;
-  const res = await apiFetch("POST", `/users/${USER_ID}/budgets`, body);
-  if (res.ok) { toast("Budget created"); location.reload(); }
-  else { const d = await res.json(); toast(d.detail || "Error", false); }
+  const cloneFrom = fd.get("clone_from");
+  const periodStart = fd.get("period_start");
+  const periodEnd = fd.get("period_end");
+
+  if (cloneFrom) {
+    // Clone the selected source into the chosen period
+    const body = { period_start: periodStart, period_end: periodEnd };
+    if (name) body.name = name;
+    const res = await apiFetch("POST", `/users/${USER_ID}/budgets/${cloneFrom}/clone`, body);
+    if (res.ok) { toast("Budget cloned"); location.reload(); }
+    else { const d = await res.json(); toast(d.detail || "Error", false); }
+  } else {
+    // Create a blank budget
+    const body = { period_start: periodStart, period_end: periodEnd };
+    if (name) body.name = name;
+    const res = await apiFetch("POST", `/users/${USER_ID}/budgets`, body);
+    if (res.ok) { toast("Budget created"); location.reload(); }
+    else { const d = await res.json(); toast(d.detail || "Error", false); }
+  }
 }
 
 async function cloneBudget(budgetId, cloneStart, cloneEnd) {
@@ -201,6 +261,18 @@ async function deleteBudget(id) {
   if (!confirm("Remove this budget and all its items?")) return;
   const res = await apiFetch("DELETE", `/users/${USER_ID}/budgets/${id}`);
   if (res.ok) { toast("Budget removed"); document.getElementById(`budget-${id}`)?.remove(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+async function setTemplate(id) {
+  const res = await apiFetch("PATCH", `/users/${USER_ID}/budgets/${id}`, { is_template: true });
+  if (res.ok) { toast("Template set"); location.reload(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+async function unsetTemplate(id) {
+  const res = await apiFetch("PATCH", `/users/${USER_ID}/budgets/${id}`, { is_template: false });
+  if (res.ok) { toast("Template cleared"); location.reload(); }
   else { const d = await res.json(); toast(d.detail || "Error", false); }
 }
 

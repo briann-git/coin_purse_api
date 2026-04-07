@@ -71,10 +71,16 @@ def ui_config(
     db: Annotated[Session, Depends(get_db)],
 ):
     accounts = (
-        active_query(db, Account).filter(Account.user_id == user_id).order_by(Account.name).all()
+        active_query(db, Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.name)
+        .all()
     )
     categories = (
-        active_query(db, Category).filter(Category.user_id == user_id).order_by(Category.name).all()
+        active_query(db, Category)
+        .filter(Category.user_id == user_id)
+        .order_by(Category.name)
+        .all()
     )
     return templates.TemplateResponse(
         "config.html",
@@ -141,7 +147,11 @@ def ui_budgets(
             {
                 "budget": b,
                 "items": items,
-                "source_name": source_name_map.get(b.source_budget_id) if b.source_budget_id else None,
+                "source_name": (
+                    source_name_map.get(b.source_budget_id)
+                    if b.source_budget_id
+                    else None
+                ),
                 "clone_start": clone_start.isoformat(),
                 "clone_end": clone_end.isoformat(),
                 "clone_label": f"{cal_lib.month_name[nm]} {ny}",
@@ -150,6 +160,7 @@ def ui_budgets(
 
     first_of_month = today.replace(day=1)
     last_of_month = today.replace(day=cal_lib.monthrange(today.year, today.month)[1])
+    template_budget = next((b for b in budgets if b.is_template), None)
     return templates.TemplateResponse(
         "budgets.html",
         {
@@ -159,5 +170,6 @@ def ui_budgets(
             "categories": categories,
             "default_start": first_of_month.isoformat(),
             "default_end": last_of_month.isoformat(),
+            "template_budget_id": str(template_budget.id) if template_budget else "",
         },
     )
