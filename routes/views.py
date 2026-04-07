@@ -159,6 +159,31 @@ def ui_budgets(
             }
         )
 
+    # Trend data — non-template budgets in chronological order
+    trend_data = []
+    for bd in reversed(budget_data):
+        b = bd["budget"]
+        if b.is_template:
+            continue
+        total = sum(float(item.limit_amount) for item in bd["items"])
+        trend_data.append(
+            {
+                "name": b.name,
+                "period_start": b.period_start.isoformat(),
+                "total_limit": total,
+                "item_count": len(bd["items"]),
+            }
+        )
+    trend_stats: dict = {}
+    if trend_data:
+        totals = [t["total_limit"] for t in trend_data]
+        trend_stats = {
+            "max": max(totals),
+            "min": min(totals),
+            "avg": sum(totals) / len(totals),
+            "count": len(totals),
+        }
+
     first_of_month = today.replace(day=1)
     last_of_month = today.replace(day=cal_lib.monthrange(today.year, today.month)[1])
     template_budget = next((b for b in budgets if b.is_template), None)
@@ -172,5 +197,7 @@ def ui_budgets(
             "default_start": first_of_month.isoformat(),
             "default_end": last_of_month.isoformat(),
             "template_budget_id": str(template_budget.id) if template_budget else "",
+            "trend_data": trend_data,
+            "trend_stats": trend_stats,
         },
     )
