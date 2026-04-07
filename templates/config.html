@@ -114,97 +114,13 @@
    ════════════════════════════════════════════════════════════════ #}
 <section>
   <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Budgets</h2>
-
-  {# Existing budgets #}
-  <div class="space-y-4" id="budget-list">
-    {% for bd in budgets %}
-    {% set b = bd.budget %}
-    <div id="budget-{{ b.id }}" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-
-      {# Budget header #}
-      <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
-        <div>
-          <p class="text-sm font-semibold text-slate-800">{{ b.name }}</p>
-          <p class="text-xs text-slate-400 mt-0.5">
-            {{ b.period_start.strftime("%b %d, %Y") }} – {{ b.period_end.strftime("%b %d, %Y") }}
-          </p>
-        </div>
-        <button
-          onclick="deleteBudget('{{ b.id }}')"
-          class="text-xs text-rose-500 hover:text-rose-700 font-medium shrink-0">
-          Remove
-        </button>
-      </div>
-
-      {# Budget items list #}
-      <ul id="items-{{ b.id }}" class="divide-y divide-slate-100">
-        {% for item in bd['items'] %}
-        <li id="bitem-{{ item.id }}" class="px-5 py-3 flex items-center justify-between gap-4">
-          <p class="text-sm text-slate-700">{{ item.category_name }}</p>
-          <div class="flex items-center gap-4">
-            <span class="text-sm font-semibold text-slate-800">{{ item.limit_amount | currency }}</span>
-            <button
-              onclick="deleteBudgetItem('{{ b.id }}', '{{ item.id }}')"
-              class="text-xs text-rose-500 hover:text-rose-700 font-medium">
-              Remove
-            </button>
-          </div>
-        </li>
-        {% endfor %}
-        {% if not bd['items'] %}
-        <li class="px-5 py-3 text-sm text-slate-400">No items yet.</li>
-        {% endif %}
-      </ul>
-
-      {# Add budget item form #}
-      <div class="px-5 py-4 border-t border-slate-100 bg-slate-50">
-        <p class="text-xs font-semibold text-slate-500 mb-3">Add Budget Item</p>
-        <form class="flex flex-wrap gap-3 items-end"
-              onsubmit="createBudgetItem(event, '{{ b.id }}')">
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-slate-500">Category</label>
-            <select name="category_id" class="input-field" required>
-              <option value="">— pick category —</option>
-              {% for cat in categories %}
-              <option value="{{ cat.id }}">{{ cat.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-slate-500">Monthly Limit</label>
-            <input name="limit_amount" type="number" step="0.01" min="0" class="input-field w-32" placeholder="0.00" required />
-          </div>
-          <button type="submit" class="btn-primary">Add Item</button>
-        </form>
-      </div>
-    </div>
-    {% endfor %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center justify-between">
+    <p class="text-sm text-slate-600">Create, clone, and manage your budget periods and line items.</p>
+    <a href="/ui/budgets/{{ user_id }}"
+       class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors shrink-0">
+      Manage Budgets →
+    </a>
   </div>
-
-  {# Add budget form #}
-  <div class="mt-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-    <div class="px-5 py-4 border-b border-slate-100">
-      <h3 class="text-xs font-semibold text-slate-500">Add Budget</h3>
-    </div>
-    <div class="px-5 py-4 bg-slate-50">
-      <form id="budget-form" class="flex flex-wrap gap-3 items-end" onsubmit="createBudget(event)">
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-slate-500">Name</label>
-          <input name="name" required class="input-field" placeholder="e.g. April 2026" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-slate-500">Start Date</label>
-          <input name="period_start" type="date" required class="input-field" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-slate-500">End Date</label>
-          <input name="period_end" type="date" required class="input-field" />
-        </div>
-        <button type="submit" class="btn-primary">Create Budget</button>
-      </form>
-    </div>
-  </div>
-
 </section>
 
 </div>{# end space-y-8 #}
@@ -279,44 +195,7 @@ async function deleteCategory(id) {
   else { const d = await res.json(); toast(d.detail || "Error", false); }
 }
 
-/* ── BUDGETS ── */
-async function createBudget(e) {
-  e.preventDefault();
-  const fd = new FormData(e.target);
-  const res = await apiFetch("POST", `/users/${USER_ID}/budgets`, {
-    name: fd.get("name"),
-    period_start: fd.get("period_start"),
-    period_end: fd.get("period_end"),
-  });
-  if (res.ok) { toast("Budget created"); location.reload(); }
-  else { const d = await res.json(); toast(d.detail || "Error", false); }
-}
 
-async function deleteBudget(id) {
-  if (!confirm("Remove this budget and all its items?")) return;
-  const res = await apiFetch("DELETE", `/users/${USER_ID}/budgets/${id}`);
-  if (res.ok) { toast("Budget removed"); document.getElementById(`budget-${id}`)?.remove(); }
-  else { const d = await res.json(); toast(d.detail || "Error", false); }
-}
-
-/* ── BUDGET ITEMS ── */
-async function createBudgetItem(e, budgetId) {
-  e.preventDefault();
-  const fd = new FormData(e.target);
-  const res = await apiFetch("POST", `/users/${USER_ID}/budgets/${budgetId}/items`, {
-    category_id: fd.get("category_id"),
-    limit_amount: fd.get("limit_amount"),
-  });
-  if (res.ok) { toast("Item added"); location.reload(); }
-  else { const d = await res.json(); toast(d.detail || "Error", false); }
-}
-
-async function deleteBudgetItem(budgetId, itemId) {
-  if (!confirm("Remove this budget item?")) return;
-  const res = await apiFetch("DELETE", `/users/${USER_ID}/budgets/${budgetId}/items/${itemId}`);
-  if (res.ok) { toast("Item removed"); document.getElementById(`bitem-${itemId}`)?.remove(); }
-  else { const d = await res.json(); toast(d.detail || "Error", false); }
-}
 </script>
 
 {% endblock %}
