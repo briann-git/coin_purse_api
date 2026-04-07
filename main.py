@@ -15,6 +15,7 @@ from routes.seed import router as seed_router
 from routes.transaction_kinds import router as transaction_kinds_router
 from routes.transactions import router as transactions_router
 from routes.users import router as user_router
+from routes.views import router as views_router
 
 app = FastAPI(title="Coin Purse")
 register_error_handlers(app)
@@ -35,6 +36,7 @@ app.include_router(seed_router)
 app.include_router(transaction_kinds_router)
 app.include_router(transactions_router)
 app.include_router(user_router)
+app.include_router(views_router)
 
 if __name__ == "__main__":
     uvicorn.run(

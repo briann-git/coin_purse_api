@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Coin Purse{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-full text-slate-800 antialiased">
+
+  <header class="bg-indigo-700 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <span class="font-bold text-xl tracking-tight select-none">Coin Purse</span>
+      <div class="flex items-center gap-6">
+        {% if user_id is defined %}
+        <nav class="flex gap-4 text-sm">
+          <a href="/ui/dashboard/{{ user_id }}"
+             class="text-indigo-200 hover:text-white transition-colors {% block nav_dashboard %}{% endblock %}">
+            Dashboard
+          </a>
+          <a href="/ui/config/{{ user_id }}"
+             class="text-indigo-200 hover:text-white transition-colors {% block nav_config %}{% endblock %}">
+            Settings
+          </a>
+        </nav>
+        {% endif %}
+        <div class="text-indigo-200 text-sm">{% block header_right %}{% endblock %}</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

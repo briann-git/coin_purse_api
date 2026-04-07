@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Config — Coin Purse{% endblock %}
+{% block nav_config %}font-semibold !text-white{% endblock %}
+
+{% block content %}
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-slate-900">Settings</h1>
+  <p class="text-slate-500 text-sm mt-0.5">Manage your accounts, categories and budgets.</p>
+</div>
+
+{# ── Error / success toast (populated by JS) ─────────────────── #}
+<div id="toast" class="hidden fixed bottom-5 right-5 z-50 max-w-sm rounded-xl shadow-lg px-5 py-3 text-sm font-medium"></div>
+
+<div class="space-y-8">
+
+{# ════════════════════════════════════════════════════════════════
+   ACCOUNTS
+   ════════════════════════════════════════════════════════════════ #}
+<section>
+  <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Accounts</h2>
+  <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+
+    {# Existing accounts #}
+    {% if accounts %}
+    <ul id="account-list" class="divide-y divide-slate-100">
+      {% for acct in accounts %}
+      <li id="acct-{{ acct.id }}" class="px-5 py-3 flex items-center justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-slate-800">{{ acct.name }}</p>
+          <p class="text-xs text-slate-400 capitalize">{{ acct.account_type }} · opening {{ acct.opening_balance | currency }}</p>
+        </div>
+        <button
+          onclick="deleteAccount('{{ acct.id }}')"
+          class="text-xs text-rose-500 hover:text-rose-700 font-medium shrink-0">
+          Remove
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p id="no-accounts-msg" class="px-5 py-4 text-sm text-slate-400">No accounts yet.</p>
+    {% endif %}
+
+    {# Add account form #}
+    <div class="px-5 py-4 border-t border-slate-100 bg-slate-50">
+      <p class="text-xs font-semibold text-slate-500 mb-3">Add Account</p>
+      <form id="account-form" class="flex flex-wrap gap-3 items-end" onsubmit="createAccount(event)">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-500">Name</label>
+          <input name="name" required class="input-field" placeholder="e.g. Savings" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-500">Type</label>
+          <select name="account_type" class="input-field">
+            <option value="bank">Bank</option>
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="mobile_money">Mobile Money</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-500">Opening Balance</label>
+          <input name="opening_balance" type="number" step="0.01" min="0" value="0.00" class="input-field w-32" />
+        </div>
+        <button type="submit" class="btn-primary">Add</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+{# ════════════════════════════════════════════════════════════════
+   CATEGORIES
+   ════════════════════════════════════════════════════════════════ #}
+<section>
+  <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Categories</h2>
+  <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+
+    {% if categories %}
+    <ul id="category-list" class="divide-y divide-slate-100">
+      {% for cat in categories %}
+      <li id="cat-{{ cat.id }}" class="px-5 py-3 flex items-center justify-between gap-4">
+        <p class="text-sm font-medium text-slate-800">{{ cat.name }}</p>
+        <button
+          onclick="deleteCategory('{{ cat.id }}')"
+          class="text-xs text-rose-500 hover:text-rose-700 font-medium shrink-0">
+          Remove
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p id="no-categories-msg" class="px-5 py-4 text-sm text-slate-400">No categories yet.</p>
+    {% endif %}
+
+    {# Add category form #}
+    <div class="px-5 py-4 border-t border-slate-100 bg-slate-50">
+      <p class="text-xs font-semibold text-slate-500 mb-3">Add Category</p>
+      <form id="category-form" class="flex gap-3 items-end" onsubmit="createCategory(event)">
+        <div class="flex flex-col gap-1 flex-1">
+          <label class="text-xs text-slate-500">Name</label>
+          <input name="name" required class="input-field" placeholder="e.g. Groceries" />
+        </div>
+        <button type="submit" class="btn-primary">Add</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+{# ════════════════════════════════════════════════════════════════
+   BUDGETS
+   ════════════════════════════════════════════════════════════════ #}
+<section>
+  <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Budgets</h2>
+
+  {# Existing budgets #}
+  <div class="space-y-4" id="budget-list">
+    {% for bd in budgets %}
+    {% set b = bd.budget %}
+    <div id="budget-{{ b.id }}" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+
+      {# Budget header #}
+      <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
+        <div>
+          <p class="text-sm font-semibold text-slate-800">{{ b.name }}</p>
+          <p class="text-xs text-slate-400 mt-0.5">
+            {{ b.period_start.strftime("%b %d, %Y") }} – {{ b.period_end.strftime("%b %d, %Y") }}
+          </p>
+        </div>
+        <button
+          onclick="deleteBudget('{{ b.id }}')"
+          class="text-xs text-rose-500 hover:text-rose-700 font-medium shrink-0">
+          Remove
+        </button>
+      </div>
+
+      {# Budget items list #}
+      <ul id="items-{{ b.id }}" class="divide-y divide-slate-100">
+        {% for item in bd['items'] %}
+        <li id="bitem-{{ item.id }}" class="px-5 py-3 flex items-center justify-between gap-4">
+          <p class="text-sm text-slate-700">{{ item.category_name }}</p>
+          <div class="flex items-center gap-4">
+            <span class="text-sm font-semibold text-slate-800">{{ item.limit_amount | currency }}</span>
+            <button
+              onclick="deleteBudgetItem('{{ b.id }}', '{{ item.id }}')"
+              class="text-xs text-rose-500 hover:text-rose-700 font-medium">
+              Remove
+            </button>
+          </div>
+        </li>
+        {% endfor %}
+        {% if not bd['items'] %}
+        <li class="px-5 py-3 text-sm text-slate-400">No items yet.</li>
+        {% endif %}
+      </ul>
+
+      {# Add budget item form #}
+      <div class="px-5 py-4 border-t border-slate-100 bg-slate-50">
+        <p class="text-xs font-semibold text-slate-500 mb-3">Add Budget Item</p>
+        <form class="flex flex-wrap gap-3 items-end"
+              onsubmit="createBudgetItem(event, '{{ b.id }}')">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">Category</label>
+            <select name="category_id" class="input-field" required>
+              <option value="">— pick category —</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-slate-500">Monthly Limit</label>
+            <input name="limit_amount" type="number" step="0.01" min="0" class="input-field w-32" placeholder="0.00" required />
+          </div>
+          <button type="submit" class="btn-primary">Add Item</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# Add budget form #}
+  <div class="mt-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100">
+      <h3 class="text-xs font-semibold text-slate-500">Add Budget</h3>
+    </div>
+    <div class="px-5 py-4 bg-slate-50">
+      <form id="budget-form" class="flex flex-wrap gap-3 items-end" onsubmit="createBudget(event)">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-500">Name</label>
+          <input name="name" required class="input-field" placeholder="e.g. April 2026" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-500">Start Date</label>
+          <input name="period_start" type="date" required class="input-field" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-500">End Date</label>
+          <input name="period_end" type="date" required class="input-field" />
+        </div>
+        <button type="submit" class="btn-primary">Create Budget</button>
+      </form>
+    </div>
+  </div>
+
+</section>
+
+</div>{# end space-y-8 #}
+
+{# ── Shared styles #}
+<style>
+  .input-field {
+    @apply border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white;
+  }
+  .btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors;
+  }
+</style>
+
+{# ── JS ──────────────────────────────────────────────────────── #}
+<script>
+const USER_ID = "{{ user_id }}";
+const API = "";  // same origin
+
+function toast(msg, ok = true) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `fixed bottom-5 right-5 z-50 max-w-sm rounded-xl shadow-lg px-5 py-3 text-sm font-medium
+    ${ok ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"}`;
+  setTimeout(() => el.classList.add("hidden"), 3000);
+}
+
+async function apiFetch(method, path, body) {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: body ? {"Content-Type": "application/json"} : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res;
+}
+
+/* ── ACCOUNTS ── */
+async function createAccount(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const res = await apiFetch("POST", `/users/${USER_ID}/accounts`, {
+    name: fd.get("name"),
+    account_type: fd.get("account_type"),
+    opening_balance: fd.get("opening_balance"),
+  });
+  if (res.ok) { toast("Account created"); location.reload(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+async function deleteAccount(id) {
+  if (!confirm("Remove this account?")) return;
+  const res = await apiFetch("DELETE", `/users/${USER_ID}/accounts/${id}`);
+  if (res.ok) { toast("Account removed"); document.getElementById(`acct-${id}`)?.remove(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+/* ── CATEGORIES ── */
+async function createCategory(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const res = await apiFetch("POST", `/users/${USER_ID}/categories`, {
+    name: fd.get("name"),
+  });
+  if (res.ok) { toast("Category created"); location.reload(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+async function deleteCategory(id) {
+  if (!confirm("Remove this category?")) return;
+  const res = await apiFetch("DELETE", `/users/${USER_ID}/categories/${id}`);
+  if (res.ok) { toast("Category removed"); document.getElementById(`cat-${id}`)?.remove(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+/* ── BUDGETS ── */
+async function createBudget(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const res = await apiFetch("POST", `/users/${USER_ID}/budgets`, {
+    name: fd.get("name"),
+    period_start: fd.get("period_start"),
+    period_end: fd.get("period_end"),
+  });
+  if (res.ok) { toast("Budget created"); location.reload(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+async function deleteBudget(id) {
+  if (!confirm("Remove this budget and all its items?")) return;
+  const res = await apiFetch("DELETE", `/users/${USER_ID}/budgets/${id}`);
+  if (res.ok) { toast("Budget removed"); document.getElementById(`budget-${id}`)?.remove(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+/* ── BUDGET ITEMS ── */
+async function createBudgetItem(e, budgetId) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const res = await apiFetch("POST", `/users/${USER_ID}/budgets/${budgetId}/items`, {
+    category_id: fd.get("category_id"),
+    limit_amount: fd.get("limit_amount"),
+  });
+  if (res.ok) { toast("Item added"); location.reload(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+async function deleteBudgetItem(budgetId, itemId) {
+  if (!confirm("Remove this budget item?")) return;
+  const res = await apiFetch("DELETE", `/users/${USER_ID}/budgets/${budgetId}/items/${itemId}`);
+  if (res.ok) { toast("Item removed"); document.getElementById(`bitem-${itemId}`)?.remove(); }
+  else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+</script>
+
+{% endblock %}
