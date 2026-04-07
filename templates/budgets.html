@@ -141,11 +141,27 @@
         {% for item in bd['items'] %}
         <li id="bitem-{{ item.id }}" class="px-5 py-3 flex items-center justify-between gap-4">
           <p class="text-sm text-slate-700">{{ item.category_name }}</p>
-          <div class="flex items-center gap-4">
-            <span class="text-sm font-semibold text-slate-800">{{ item.limit_amount | currency }}</span>
+          <div class="flex items-center gap-2">
+            <span id="amount-{{ item.id }}" class="text-sm font-semibold text-slate-800">{{ item.limit_amount | currency }}</span>
+            <input id="amount-input-{{ item.id }}" type="number" step="0.01" min="0"
+                   class="hidden input-field w-28 text-sm py-0.5"
+                   value="{{ item.limit_amount }}"
+                   onkeydown="handleAmountKey(event, '{{ b.id }}', '{{ item.id }}')" />
+            <button id="edit-btn-{{ item.id }}"
+                    onclick="startEditItem('{{ item.id }}')"
+                    class="text-slate-300 hover:text-indigo-500 transition-colors"
+                    title="Edit amount">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+              </svg>
+            </button>
+            <button id="cancel-btn-{{ item.id }}"
+                    onclick="cancelEditItem('{{ item.id }}')"
+                    class="hidden text-xs text-slate-400 hover:text-rose-500 transition-colors"
+                    title="Cancel edit">✕</button>
             <button
               onclick="deleteBudgetItem('{{ b.id }}', '{{ item.id }}')"
-              class="text-xs text-rose-500 hover:text-rose-700 font-medium">
+              class="text-xs text-rose-500 hover:text-rose-700 font-medium ml-2">
               Remove
             </button>
           </div>
@@ -319,6 +335,48 @@ async function createBudgetItem(e, budgetId) {
   });
   if (res.ok) { toast("Item added"); location.reload(); }
   else { const d = await res.json(); toast(d.detail || "Error", false); }
+}
+
+function startEditItem(itemId) {
+  document.getElementById(`amount-${itemId}`).classList.add("hidden");
+  document.getElementById(`edit-btn-${itemId}`).classList.add("hidden");
+  const input = document.getElementById(`amount-input-${itemId}`);
+  input.classList.remove("hidden");
+  document.getElementById(`cancel-btn-${itemId}`).classList.remove("hidden");
+  input.focus();
+  input.select();
+}
+
+function cancelEditItem(itemId) {
+  document.getElementById(`amount-input-${itemId}`).classList.add("hidden");
+  document.getElementById(`cancel-btn-${itemId}`).classList.add("hidden");
+  document.getElementById(`amount-${itemId}`).classList.remove("hidden");
+  document.getElementById(`edit-btn-${itemId}`).classList.remove("hidden");
+}
+
+function handleAmountKey(e, budgetId, itemId) {
+  if (e.key === "Enter") { e.preventDefault(); saveItemAmount(budgetId, itemId); }
+  if (e.key === "Escape") { cancelEditItem(itemId); }
+}
+
+async function saveItemAmount(budgetId, itemId) {
+  const input = document.getElementById(`amount-input-${itemId}`);
+  const val = parseFloat(input.value);
+  if (isNaN(val) || val < 0) { toast("Invalid amount", false); return; }
+  const res = await apiFetch("PATCH", `/users/${USER_ID}/budgets/${budgetId}/items/${itemId}`, {
+    limit_amount: val.toFixed(2),
+  });
+  if (res.ok) {
+    const data = await res.json();
+    const amt = parseFloat(data.limit_amount);
+    document.getElementById(`amount-${itemId}`).textContent =
+      "$" + amt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    cancelEditItem(itemId);
+    toast("Amount updated");
+  } else {
+    const d = await res.json();
+    toast(d.detail || "Error", false);
+  }
 }
 
 async function deleteBudgetItem(budgetId, itemId) {
