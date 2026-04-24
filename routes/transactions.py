@@ -11,22 +11,33 @@ from sqlalchemy.orm import Session
 from common.db.config import get_db
 from helpers.db_utils import active_query, require_owned_active, soft_delete
 from helpers.kinds import resolve_kind_id_or_400
-from models.models import Account, Category, Transaction
-from schemas.transactions import TransactionCreate, TransactionRead, TransactionUpdate
+from models.models import Account, Category, Transaction, TransactionKind
+from schemas.transactions import (
+    KindName,
+    TransactionCreate,
+    TransactionRead,
+    TransactionUpdate,
+)
 
 router = APIRouter(prefix="/users/{user_id}/transactions", tags=["transactions"])
 
 
 def _require_owned_active_account(db: Session, user_id: UUID, account_id: UUID):
-    return require_owned_active(db, Account, account_id, user_id, detail="Account not found")
+    return require_owned_active(
+        db, Account, account_id, user_id, detail="Account not found"
+    )
 
 
 def _require_owned_active_category(db: Session, user_id: UUID, category_id: UUID):
-    return require_owned_active(db, Category, category_id, user_id, detail="Category not found")
+    return require_owned_active(
+        db, Category, category_id, user_id, detail="Category not found"
+    )
 
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
-def create_transaction(user_id: UUID, payload: TransactionCreate, db: Annotated[Session, Depends(get_db)]):
+def create_transaction(
+    user_id: UUID, payload: TransactionCreate, db: Annotated[Session, Depends(get_db)]
+):
     kind_id = resolve_kind_id_or_400(db, payload.kind)
 
     _require_owned_active_account(db, user_id, payload.account_id)
@@ -34,10 +45,14 @@ def create_transaction(user_id: UUID, payload: TransactionCreate, db: Annotated[
     transfer_group_id = None
     if payload.kind == "transfer":
         if not payload.to_account_id:
-            raise HTTPException(status_code=400, detail="to_account_id required for transfer")
+            raise HTTPException(
+                status_code=400, detail="to_account_id required for transfer"
+            )
         _require_owned_active_account(db, user_id, payload.to_account_id)
         if payload.category_id is not None:
-            raise HTTPException(status_code=400, detail="category_id must be null for transfers")
+            raise HTTPException(
+                status_code=400, detail="category_id must be null for transfers"
+            )
         transfer_group_id = payload.transfer_group_id or uuid4()
     else:
         if payload.to_account_id is not None:
@@ -50,7 +65,9 @@ def create_transaction(user_id: UUID, payload: TransactionCreate, db: Annotated[
 
     if payload.kind == "refund":
         if not payload.refunded_transaction_id:
-            raise HTTPException(status_code=400, detail="refunded_transaction_id required for refunds")
+            raise HTTPException(
+                status_code=400, detail="refunded_transaction_id required for refunds"
+            )
         _ = require_owned_active(
             db,
             Transaction,
@@ -86,6 +103,7 @@ def list_transactions(
     end: Annotated[date | None, Query()] = None,
     account_id: Annotated[UUID | None, Query()] = None,
     category_id: Annotated[UUID | None, Query()] = None,
+    kind: Annotated[KindName | None, Query()] = None,
 ):
     q = active_query(db, Transaction).filter(Transaction.user_id == user_id)
     if start:
@@ -96,14 +114,22 @@ def list_transactions(
         q = q.filter(Transaction.account_id == account_id)
     if category_id:
         q = q.filter(Transaction.category_id == category_id)
+    if kind:
+        q = q.join(TransactionKind, Transaction.kind_id == TransactionKind.id).filter(
+            TransactionKind.name == kind
+        )
 
     txns = q.order_by(Transaction.posted_at.desc()).all()
     return [TransactionRead.model_validate(t, from_attributes=True) for t in txns]
 
 
 @router.get("/{transaction_id}", response_model=TransactionRead)
-def get_transaction(user_id: UUID, transaction_id: UUID, db: Annotated[Session, Depends(get_db)]):
-    txn = require_owned_active(db, Transaction, transaction_id, user_id, detail="Transaction not found")
+def get_transaction(
+    user_id: UUID, transaction_id: UUID, db: Annotated[Session, Depends(get_db)]
+):
+    txn = require_owned_active(
+        db, Transaction, transaction_id, user_id, detail="Transaction not found"
+    )
     return TransactionRead.model_validate(txn, from_attributes=True)
 
 
@@ -114,10 +140,14 @@ def update_transaction(
     payload: TransactionUpdate,
     db: Annotated[Session, Depends(get_db)],
 ):
-    txn = require_owned_active(db, Transaction, transaction_id, user_id, detail="Transaction not found")
+    txn = require_owned_active(
+        db, Transaction, transaction_id, user_id, detail="Transaction not found"
+    )
 
     if txn.kind.name == "transfer":
-        raise HTTPException(status_code=409, detail="Transfer transactions cannot be edited.")
+        raise HTTPException(
+            status_code=409, detail="Transfer transactions cannot be edited."
+        )
 
     data = payload.model_dump(exclude_unset=True)
 
@@ -136,8 +166,12 @@ def update_transaction(
 
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deactivate_transaction(user_id: UUID, transaction_id: UUID, db: Annotated[Session, Depends(get_db)]):
-    _ = require_owned_active(db, Transaction, transaction_id, user_id, detail="Transaction not found")
+def deactivate_transaction(
+    user_id: UUID, transaction_id: UUID, db: Annotated[Session, Depends(get_db)]
+):
+    _ = require_owned_active(
+        db, Transaction, transaction_id, user_id, detail="Transaction not found"
+    )
     deleted = soft_delete(db, Transaction, transaction_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Transaction not found")
