@@ -11,11 +11,19 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from common.db.config import get_db
 from helpers.db_utils import active_query
-from models.models import Account, Budget, BudgetItem, Category
+from models.models import (
+    Account,
+    Budget,
+    BudgetItem,
+    Category,
+    Transaction,
+    TransactionKind,
+)
 from routes.dashboard import get_dashboard
 
 _TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
@@ -59,8 +67,9 @@ def ui_dashboard(
 ):
     data = get_dashboard(user_id, db)
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
-        {"request": request, **data, "user_id": str(user_id)},
+        {**data, "user_id": str(user_id)},
     )
 
 
@@ -83,9 +92,9 @@ def ui_config(
         .all()
     )
     return templates.TemplateResponse(
+        request,
         "config.html",
         {
-            "request": request,
             "user_id": str(user_id),
             "accounts": accounts,
             "categories": categories,
@@ -181,7 +190,9 @@ def ui_budgets(
             cat_data[item.category_name][i] = float(item.limit_amount)
     trend_labels = [t["name"] for t in trend_data]
     trend_series = [{"name": cat, "data": cat_data[cat]} for cat in sorted(cat_data)]
-    trend_series.insert(0, {"name": "Total", "data": [t["total_limit"] for t in trend_data]})
+    trend_series.insert(
+        0, {"name": "Total", "data": [t["total_limit"] for t in trend_data]}
+    )
     trend_stats: dict = {}
     if trend_data:
         totals = [t["total_limit"] for t in trend_data]
@@ -196,9 +207,9 @@ def ui_budgets(
     last_of_month = today.replace(day=cal_lib.monthrange(today.year, today.month)[1])
     template_budget = next((b for b in budgets if b.is_template), None)
     return templates.TemplateResponse(
+        request,
         "budgets.html",
         {
-            "request": request,
             "user_id": str(user_id),
             "budgets": budget_data,
             "categories": categories,
@@ -211,3 +222,109 @@ def ui_budgets(
             "trend_series": trend_series,
         },
     )
+
+
+@router.get("/ui/transactions/{user_id}", response_class=HTMLResponse)
+def ui_transactions(
+    request: Request,
+    user_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+):
+    accounts = (
+        active_query(db, Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.name)
+        .all()
+    )
+    categories = (
+        active_query(db, Category)
+        .filter(Category.user_id == user_id)
+        .order_by(Category.name)
+        .all()
+    )
+    kinds = active_query(db, TransactionKind).order_by(TransactionKind.name).all()
+
+    # Recent transactions — last 50
+    transactions = (
+        active_query(db, Transaction)
+        .filter(Transaction.user_id == user_id)
+        .order_by(Transaction.posted_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    # Stats: count by kind
+    kind_counts_rows = (
+        db.query(TransactionKind.name, func.count(Transaction.id).label("cnt"))
+        .join(Transaction, Transaction.kind_id == TransactionKind.id)
+        .filter(Transaction.user_id == user_id, Transaction.is_active.is_(True))
+        .group_by(TransactionKind.name)
+        .all()
+    )
+    kind_counts = {row.name: row.cnt for row in kind_counts_rows}
+
+    # Stats: transactions per day for last 7 days
+    today = datetime.datetime.now(UTC).date()
+    last7 = [today - datetime.timedelta(days=i) for i in reversed(range(7))]
+    daily_counts_rows = (
+        db.query(Transaction.posted_at, func.count(Transaction.id).label("cnt"))
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.is_active.is_(True),
+            Transaction.posted_at >= last7[0],
+        )
+        .group_by(Transaction.posted_at)
+        .all()
+    )
+    daily_map = {row.posted_at: row.cnt for row in daily_counts_rows}
+    daily_labels = [d.strftime("%a %d") for d in last7]
+    daily_data = [daily_map.get(d, 0) for d in last7]
+
+    return templates.TemplateResponse(
+        request,
+        "transactions.html",
+        {
+            "user_id": str(user_id),
+            "accounts": accounts,
+            "categories": categories,
+            "kinds": kinds,
+            "transactions": transactions,
+            "kind_counts": kind_counts,
+            "daily_labels": daily_labels,
+            "daily_data": daily_data,
+        },
+    )
+
+
+@router.get("/ui/transactions/{user_id}/stats")
+def ui_transactions_stats(
+    user_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+):
+    kind_counts_rows = (
+        db.query(TransactionKind.name, func.count(Transaction.id).label("cnt"))
+        .join(Transaction, Transaction.kind_id == TransactionKind.id)
+        .filter(Transaction.user_id == user_id, Transaction.is_active.is_(True))
+        .group_by(TransactionKind.name)
+        .all()
+    )
+    kind_counts = {row.name: row.cnt for row in kind_counts_rows}
+
+    today = datetime.datetime.now(UTC).date()
+    last7 = [today - datetime.timedelta(days=i) for i in reversed(range(7))]
+    daily_counts_rows = (
+        db.query(Transaction.posted_at, func.count(Transaction.id).label("cnt"))
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.is_active.is_(True),
+            Transaction.posted_at >= last7[0],
+        )
+        .group_by(Transaction.posted_at)
+        .all()
+    )
+    daily_map = {row.posted_at: row.cnt for row in daily_counts_rows}
+    return {
+        "kind_counts": kind_counts,
+        "daily_labels": [d.strftime("%a %d") for d in last7],
+        "daily_data": [daily_map.get(d, 0) for d in last7],
+    }
