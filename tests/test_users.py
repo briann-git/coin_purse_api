@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 
 def test_create_user_returns_201(client: TestClient):
-    res = client.post("/users", json={"name": "Alice", "email": "alice@example.com", "password": "Secret123!"})
+    res = client.post("/users", json={"name": "Alice", "email": "alice@example.com"})
     assert res.status_code == 201
     data = res.json()
     assert data["name"] == "Alice"
@@ -25,25 +25,20 @@ def test_create_user_returns_201(client: TestClient):
 def test_create_user_with_phone(client: TestClient):
     res = client.post(
         "/users",
-        json={"name": "Bob", "email": "bob@example.com", "password": "Secret123!", "phone": "+1234567890"},
+        json={"name": "Bob", "email": "bob@example.com", "phone": "+1234567890"},
     )
     assert res.status_code == 201
     assert res.json()["phone"] == "+1234567890"
 
 
 def test_create_user_duplicate_email_returns_400(client: TestClient):
-    payload = {"name": "Alice", "email": "dup@example.com", "password": "Secret123!"}
+    payload = {"name": "Alice", "email": "dup@example.com"}
     assert client.post("/users", json=payload).status_code == 201
     assert client.post("/users", json=payload).status_code == 400
 
 
-def test_create_user_short_password_returns_422(client: TestClient):
-    res = client.post("/users", json={"name": "A", "email": "a@example.com", "password": "short"})
-    assert res.status_code == 422
-
-
 def test_create_user_invalid_email_returns_422(client: TestClient):
-    res = client.post("/users", json={"name": "A", "email": "not-an-email", "password": "Secret123!"})
+    res = client.post("/users", json={"name": "A", "email": "not-an-email"})
     assert res.status_code == 422
 
 

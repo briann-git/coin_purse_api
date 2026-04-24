@@ -9,7 +9,6 @@ class UserCreate(APIModel):
     name: str = Field(min_length=1, max_length=200)
     email: EmailStr
     phone: str | None = Field(default=None, max_length=50)
-    password: str = Field(min_length=8, max_length=1024)  # plain input; you hash server-side
 
 
 class UserUpdate(APIModel):

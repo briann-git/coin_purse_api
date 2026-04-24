@@ -114,7 +114,6 @@ def user(client: TestClient) -> dict:
         json={
             "name": "Test User",
             "email": "test@example.com",
-            "password": "TestPass123!",
         },
     )
     assert res.status_code == 201, res.text

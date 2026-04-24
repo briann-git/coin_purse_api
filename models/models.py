@@ -61,13 +61,42 @@ class User(TimestampMixin, Base):
         String(320), nullable=False, unique=True, index=True
     )
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # Google OAuth — stable identifier from the `sub` claim of the ID token
+    google_sub: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, unique=True, index=True
+    )
 
     accounts: Mapped[list[Account]] = relationship(back_populates="user")
     categories: Mapped[list[Category]] = relationship(back_populates="user")
     budgets: Mapped[list[Budget]] = relationship(back_populates="user")
     transactions: Mapped[list[Transaction]] = relationship(back_populates="user")
     recurring: Mapped[list[RecurringTransaction]] = relationship(back_populates="user")
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class RefreshToken(TimestampMixin, Base):
+    __tablename__ = "refresh_tokens"
+    __table_args__ = (Index("ix_refresh_tokens_user_id", "user_id"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Store a SHA-256 hash of the token, never the plaintext
+    token_hash: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    revoked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+
+    user: Mapped[User] = relationship(back_populates="refresh_tokens")
 
 
 class Account(TimestampMixin, Base):
@@ -242,7 +271,9 @@ class Budget(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
-    is_template: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("0"))
+    is_template: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("0")
+    )
     source_budget_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("budgets.id", ondelete="SET NULL"),

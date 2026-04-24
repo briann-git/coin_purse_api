@@ -16,7 +16,6 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-import bcrypt
 from sqlalchemy.orm import Session
 
 from helpers.db_utils import active_query
@@ -42,8 +41,8 @@ DEFAULT_BUDGET_LIMITS = [
 ]
 
 
-def _hash(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+def _hash(password: str) -> str:  # noqa: ARG001 — kept for compatibility, no-op
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +159,6 @@ def create_full_dev_seed(db: Session) -> dict:
         name="Test User",
         email=test_email,
         phone="+254700000000",
-        password_hash=_hash("TestPass123!"),
     )
     db.add(user)
     db.flush()  # get user.id

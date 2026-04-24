@@ -175,7 +175,6 @@ def test_stats_isolated_per_user(client: TestClient, user_id: str, account: dict
         json={
             "name": "Other",
             "email": f"{uuid.uuid4()}@test.com",
-            "password": "OtherPass1!",
         },
     ).json()["id"]
 
