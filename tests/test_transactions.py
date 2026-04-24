@@ -236,6 +236,21 @@ def test_update_transaction_wrong_user_returns_404(client: TestClient, user_id: 
     assert res.status_code == 404
 
 
+def test_update_transfer_returns_409(client: TestClient, user_id: str, account: dict, second_account: dict):
+    transfer = client.post(
+        f"/users/{user_id}/transactions", json=_transfer(account["id"], second_account["id"])
+    ).json()
+    res = client.patch(f"/users/{user_id}/transactions/{transfer['id']}", json={"description": "changed"})
+    assert res.status_code == 409
+
+
+def test_update_non_transfer_still_works(client: TestClient, user_id: str, account: dict):
+    txn = client.post(f"/users/{user_id}/transactions", json=_expense(account["id"], description="old")).json()
+    res = client.patch(f"/users/{user_id}/transactions/{txn['id']}", json={"description": "updated"})
+    assert res.status_code == 200
+    assert res.json()["description"] == "updated"
+
+
 # ---------------------------------------------------------------------------
 # DELETE /users/{user_id}/transactions/{transaction_id}
 # ---------------------------------------------------------------------------

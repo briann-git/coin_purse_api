@@ -116,6 +116,9 @@ def update_transaction(
 ):
     txn = require_owned_active(db, Transaction, transaction_id, user_id, detail="Transaction not found")
 
+    if txn.kind.name == "transfer":
+        raise HTTPException(status_code=409, detail="Transfer transactions cannot be edited.")
+
     data = payload.model_dump(exclude_unset=True)
 
     # Basic safety: validate new refs are active + owned
