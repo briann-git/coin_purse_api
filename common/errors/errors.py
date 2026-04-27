@@ -28,6 +28,11 @@ def _map_status_to_code(status_code: int) -> str:
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(_request: Request, exc: StarletteHTTPException):
+        # Pass redirects through as-is so _require_session can redirect to /auth/login.
+        if 300 <= exc.status_code < 400:
+            from fastapi.responses import RedirectResponse  # noqa: PLC0415
+            location = (exc.headers or {}).get("location", "/")
+            return RedirectResponse(location, status_code=exc.status_code)
         code = getattr(exc, "detail_code", None) or _map_status_to_code(exc.status_code)
         payload = ErrorResponse(
             error=code,

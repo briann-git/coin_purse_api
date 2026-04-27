@@ -32,7 +32,18 @@
           </a>
         </nav>
         {% endif %}
-        <div class="text-indigo-200 text-sm">{% block header_right %}{% endblock %}</div>
+        <div class="flex items-center gap-4 text-sm">
+          {% block header_right %}{% endblock %}
+          {% if session_user_name is defined and session_user_name %}
+          <span class="text-indigo-300 hidden sm:block">{{ session_user_name }}</span>
+          <form action="/auth/logout" method="post">
+            <button type="submit"
+                    class="text-indigo-200 hover:text-white transition-colors">
+              Sign out
+            </button>
+          </form>
+          {% endif %}
+        </div>
       </div>
     </div>
   </header>

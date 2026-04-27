@@ -36,31 +36,50 @@ def category(client: TestClient, user_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Auth guard
+# ---------------------------------------------------------------------------
+
+
+def test_transactions_page_redirects_when_unauthenticated(
+    client: TestClient, user_id: str
+):
+    res = client.get(f"/ui/transactions/{user_id}", follow_redirects=False)
+    assert res.status_code == 302
+    assert "/auth/login" in res.headers["location"]
+
+
+def test_stats_redirects_when_unauthenticated(client: TestClient, user_id: str):
+    res = client.get(f"/ui/transactions/{user_id}/stats", follow_redirects=False)
+    assert res.status_code == 302
+    assert "/auth/login" in res.headers["location"]
+
+
+# ---------------------------------------------------------------------------
 # GET /ui/transactions/{user_id}
 # ---------------------------------------------------------------------------
 
 
-def test_transactions_page_returns_200(client: TestClient, user_id: str):
-    res = client.get(f"/ui/transactions/{user_id}")
+def test_transactions_page_returns_200(web_client: TestClient, user_id: str):
+    res = web_client.get(f"/ui/transactions/{user_id}")
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]
 
 
-def test_transactions_page_contains_form(client: TestClient, user_id: str):
-    res = client.get(f"/ui/transactions/{user_id}")
+def test_transactions_page_contains_form(web_client: TestClient, user_id: str):
+    res = web_client.get(f"/ui/transactions/{user_id}")
     assert "txn-form" in res.text
     assert "Save Transaction" in res.text
 
 
 def test_transactions_page_lists_accounts_in_form(
-    client: TestClient, user_id: str, account: dict
+    web_client: TestClient, user_id: str, account: dict
 ):
-    res = client.get(f"/ui/transactions/{user_id}")
+    res = web_client.get(f"/ui/transactions/{user_id}")
     assert account["name"] in res.text
 
 
 def test_transactions_page_shows_transaction_log(
-    client: TestClient, user_id: str, account: dict
+    web_client: TestClient, client: TestClient, user_id: str, account: dict
 ):
     client.post(
         f"/users/{user_id}/transactions",
@@ -71,15 +90,15 @@ def test_transactions_page_shows_transaction_log(
             "posted_at": TODAY,
         },
     )
-    res = client.get(f"/ui/transactions/{user_id}")
+    res = web_client.get(f"/ui/transactions/{user_id}")
     assert "42" in res.text
 
 
 def test_transactions_page_renders_with_no_transactions(
-    client: TestClient, user_id: str
+    web_client: TestClient, user_id: str
 ):
     """Page should render and show empty state message when there are no transactions."""
-    res = client.get(f"/ui/transactions/{user_id}")
+    res = web_client.get(f"/ui/transactions/{user_id}")
     assert res.status_code == 200
     assert "No transactions yet" in res.text
 
@@ -89,13 +108,13 @@ def test_transactions_page_renders_with_no_transactions(
 # ---------------------------------------------------------------------------
 
 
-def test_stats_returns_200(client: TestClient, user_id: str):
-    res = client.get(f"/ui/transactions/{user_id}/stats")
+def test_stats_returns_200(web_client: TestClient, user_id: str):
+    res = web_client.get(f"/ui/transactions/{user_id}/stats")
     assert res.status_code == 200
 
 
-def test_stats_structure(client: TestClient, user_id: str):
-    res = client.get(f"/ui/transactions/{user_id}/stats")
+def test_stats_structure(web_client: TestClient, user_id: str):
+    res = web_client.get(f"/ui/transactions/{user_id}/stats")
     data = res.json()
     assert "kind_counts" in data
     assert "daily_labels" in data
@@ -105,34 +124,23 @@ def test_stats_structure(client: TestClient, user_id: str):
 
 
 def test_stats_kind_counts_reflect_transactions(
-    client: TestClient, user_id: str, account: dict, second_account: dict
+    web_client: TestClient,
+    client: TestClient,
+    user_id: str,
+    account: dict,
+    second_account: dict,
 ):
     client.post(
         f"/users/{user_id}/transactions",
-        json={
-            "kind": "income",
-            "account_id": account["id"],
-            "amount": "100.00",
-            "posted_at": TODAY,
-        },
+        json={"kind": "income", "account_id": account["id"], "amount": "100.00", "posted_at": TODAY},
     )
     client.post(
         f"/users/{user_id}/transactions",
-        json={
-            "kind": "income",
-            "account_id": account["id"],
-            "amount": "200.00",
-            "posted_at": TODAY,
-        },
+        json={"kind": "income", "account_id": account["id"], "amount": "200.00", "posted_at": TODAY},
     )
     client.post(
         f"/users/{user_id}/transactions",
-        json={
-            "kind": "expense",
-            "account_id": account["id"],
-            "amount": "50.00",
-            "posted_at": TODAY,
-        },
+        json={"kind": "expense", "account_id": account["id"], "amount": "50.00", "posted_at": TODAY},
     )
     client.post(
         f"/users/{user_id}/transactions",
@@ -144,7 +152,7 @@ def test_stats_kind_counts_reflect_transactions(
             "posted_at": TODAY,
         },
     )
-    data = client.get(f"/ui/transactions/{user_id}/stats").json()
+    data = web_client.get(f"/ui/transactions/{user_id}/stats").json()
     assert data["kind_counts"].get("income") == 2
     assert data["kind_counts"].get("expense") == 1
     assert data["kind_counts"].get("transfer") == 1
@@ -152,41 +160,30 @@ def test_stats_kind_counts_reflect_transactions(
 
 
 def test_stats_daily_data_counts_todays_transactions(
-    client: TestClient, user_id: str, account: dict
+    web_client: TestClient, client: TestClient, user_id: str, account: dict
 ):
     for _ in range(3):
         client.post(
             f"/users/{user_id}/transactions",
-            json={
-                "kind": "expense",
-                "account_id": account["id"],
-                "amount": "10.00",
-                "posted_at": TODAY,
-            },
+            json={"kind": "expense", "account_id": account["id"], "amount": "10.00", "posted_at": TODAY},
         )
-    data = client.get(f"/ui/transactions/{user_id}/stats").json()
+    data = web_client.get(f"/ui/transactions/{user_id}/stats").json()
     assert sum(data["daily_data"]) >= 3
 
 
-def test_stats_isolated_per_user(client: TestClient, user_id: str, account: dict):
+def test_stats_isolated_per_user(
+    web_client: TestClient, client: TestClient, user_id: str, account: dict
+):
     """Stats for one user should not include another user's transactions."""
     other_uid = client.post(
         "/users",
-        json={
-            "name": "Other",
-            "email": f"{uuid.uuid4()}@test.com",
-        },
+        json={"name": "Other", "email": f"{uuid.uuid4()}@test.com"},
     ).json()["id"]
 
     client.post(
         f"/users/{user_id}/transactions",
-        json={
-            "kind": "income",
-            "account_id": account["id"],
-            "amount": "500.00",
-            "posted_at": TODAY,
-        },
+        json={"kind": "income", "account_id": account["id"], "amount": "500.00", "posted_at": TODAY},
     )
 
-    data = client.get(f"/ui/transactions/{other_uid}/stats").json()
+    data = web_client.get(f"/ui/transactions/{other_uid}/stats").json()
     assert data["kind_counts"].get("income", 0) == 0

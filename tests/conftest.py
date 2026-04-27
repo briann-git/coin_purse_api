@@ -22,6 +22,7 @@ from common.db.config import get_db
 from helpers.seed_data import seed_transaction_kinds
 from main import app
 from models.models import Base
+from routes.views import _require_session
 
 # ---------------------------------------------------------------------------
 # Engine / schema — session-scoped (built once for the whole test run)
@@ -99,6 +100,27 @@ def client(db: Session):
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
     app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def web_client(db: Session, user_id: str):
+    """TestClient that bypasses session auth for web UI route tests."""
+
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass
+
+    def override_session():
+        return user_id
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[_require_session] = override_session
+    with TestClient(app, raise_server_exceptions=True) as c:
+        yield c
+    app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(_require_session, None)
 
 
 # ---------------------------------------------------------------------------

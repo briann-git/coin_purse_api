@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -59,17 +59,34 @@ templates.env.filters["kind_badge"] = _kind_badge
 router = APIRouter(tags=["ui"])
 
 
+def _require_session(request: Request) -> str:
+    """Redirect to /auth/login if the user is not in the session."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        request.session["next"] = str(request.url)
+        raise HTTPException(
+            status_code=302,
+            headers={"location": "/auth/login"},
+        )
+    return user_id
+
+
 @router.get("/ui/dashboard/{user_id}", response_class=HTMLResponse)
 def ui_dashboard(
     request: Request,
     user_id: UUID,
     db: Annotated[Session, Depends(get_db)],
+    _session_user: Annotated[str, Depends(_require_session)],
 ):
     data = get_dashboard(user_id, db)
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {**data, "user_id": str(user_id)},
+        {
+            **data,
+            "user_id": str(user_id),
+            "session_user_name": request.session.get("user_name"),
+        },
     )
 
 
@@ -78,6 +95,7 @@ def ui_config(
     request: Request,
     user_id: UUID,
     db: Annotated[Session, Depends(get_db)],
+    _session_user: Annotated[str, Depends(_require_session)],
 ):
     accounts = (
         active_query(db, Account)
@@ -98,6 +116,7 @@ def ui_config(
             "user_id": str(user_id),
             "accounts": accounts,
             "categories": categories,
+            "session_user_name": request.session.get("user_name"),
         },
     )
 
@@ -107,6 +126,7 @@ def ui_budgets(
     request: Request,
     user_id: UUID,
     db: Annotated[Session, Depends(get_db)],
+    _session_user: Annotated[str, Depends(_require_session)],
 ):
     today = datetime.datetime.now(UTC).date()
     budgets = (
@@ -220,6 +240,7 @@ def ui_budgets(
             "trend_stats": trend_stats,
             "trend_labels": trend_labels,
             "trend_series": trend_series,
+            "session_user_name": request.session.get("user_name"),
         },
     )
 
@@ -229,6 +250,7 @@ def ui_transactions(
     request: Request,
     user_id: UUID,
     db: Annotated[Session, Depends(get_db)],
+    _session_user: Annotated[str, Depends(_require_session)],
 ):
     accounts = (
         active_query(db, Account)
@@ -292,6 +314,7 @@ def ui_transactions(
             "kind_counts": kind_counts,
             "daily_labels": daily_labels,
             "daily_data": daily_data,
+            "session_user_name": request.session.get("user_name"),
         },
     )
 
@@ -300,6 +323,7 @@ def ui_transactions(
 def ui_transactions_stats(
     user_id: UUID,
     db: Annotated[Session, Depends(get_db)],
+    _session_user: Annotated[str, Depends(_require_session)],
 ):
     kind_counts_rows = (
         db.query(TransactionKind.name, func.count(Transaction.id).label("cnt"))
