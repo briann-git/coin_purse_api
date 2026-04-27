@@ -12,6 +12,10 @@ from __future__ import annotations
 
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()  # loads .env from the project root (no-op if not present)
+
 # Google OAuth credentials (from Google Cloud Console → OAuth 2.0 Client IDs)
 GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
