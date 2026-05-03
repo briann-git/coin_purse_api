@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import datetime
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 
-TODAY = "2026-04-24"
+TODAY = datetime.date.today().isoformat()
 
 
 @pytest.fixture
