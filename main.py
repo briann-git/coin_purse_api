@@ -3,8 +3,6 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from common.auth.config import JWT_SECRET
-from common.db import Base
-from common.db.config import engine
 from common.errors.errors import register_error_handlers
 from routes.accounts import router as accounts_router
 from routes.auth import router as auth_router
@@ -23,11 +21,6 @@ from routes.views import router as views_router
 app = FastAPI(title="Coin Purse")
 register_error_handlers(app)
 app.add_middleware(SessionMiddleware, secret_key=JWT_SECRET)
-
-
-metadata = Base.metadata
-
-metadata.create_all(bind=engine)
 
 app.include_router(auth_router)
 app.include_router(accounts_router)
