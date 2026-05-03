@@ -11,7 +11,9 @@ DATABASE_URL: str = os.getenv(
     "sqlite:///./budget_app.db",
 )
 
-_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+_connect_args = (
+    {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+)
 
 engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 
