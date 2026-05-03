@@ -20,19 +20,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Fix is_template column: change DEFAULT from string 'false' to integer 0,
-    and update any existing rows that were stored as the string 'false' to 0."""
+    """Ensure is_template DEFAULT is the boolean false."""
     with op.batch_alter_table("budgets") as batch_op:
         batch_op.alter_column(
             "is_template",
             existing_type=sa.Boolean(),
-            server_default=sa.text("0"),
+            server_default=sa.text("false"),
             existing_nullable=False,
         )
-    # Fix rows stored as the string 'false' (truthy) → integer 0
-    op.execute(
-        "UPDATE budgets SET is_template = 0 WHERE typeof(is_template) = 'text' AND is_template != '1'"
-    )
 
 
 def downgrade() -> None:
