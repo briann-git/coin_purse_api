@@ -215,10 +215,9 @@ def refresh_tokens(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/logout")
 def logout(
     request: Request,
-    response: Response,
     db: Annotated[Session, Depends(get_db)],
     payload: RefreshRequest | None = None,
     refresh_token_cookie: Annotated[str | None, Cookie(alias=_REFRESH_COOKIE)] = None,
@@ -235,7 +234,9 @@ def logout(
             db.commit()
 
     request.session.clear()
-    response.delete_cookie(_REFRESH_COOKIE, path="/auth")
+    redirect = RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
+    redirect.delete_cookie(_REFRESH_COOKIE, path="/auth")
+    return redirect
 
 
 # ---------------------------------------------------------------------------

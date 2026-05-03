@@ -35,13 +35,43 @@
         <div class="flex items-center gap-4 text-sm">
           {% block header_right %}{% endblock %}
           {% if session_user_name is defined and session_user_name %}
-          <span class="text-indigo-300 hidden sm:block">{{ session_user_name }}</span>
-          <form action="/auth/logout" method="post">
-            <button type="submit"
-                    class="text-indigo-200 hover:text-white transition-colors">
-              Sign out
+          <div class="relative" id="user-menu-container">
+            <button onclick="toggleUserMenu()" id="user-menu-btn"
+                    title="{{ session_user_name }}"
+                    class="w-9 h-9 rounded-full bg-indigo-500 hover:bg-indigo-400 flex items-center justify-center text-white font-semibold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-700 select-none">
+              {{ session_user_name[0] | upper }}
             </button>
-          </form>
+            <div id="user-menu"
+                 class="hidden absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50 text-slate-700">
+              <div class="px-4 py-2 text-sm font-medium text-slate-900 border-b border-slate-100 truncate">
+                {{ session_user_name }}
+              </div>
+              {% if user_id is defined %}
+              <a href="/ui/config/{{ user_id }}"
+                 class="block px-4 py-2 text-sm hover:bg-slate-50 transition-colors">
+                Personal settings
+              </a>
+              {% endif %}
+              <form action="/auth/logout" method="post">
+                <button type="submit"
+                        class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-slate-50 transition-colors">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </div>
+          <script>
+            function toggleUserMenu() {
+              document.getElementById('user-menu').classList.toggle('hidden');
+            }
+            document.addEventListener('click', function(e) {
+              var btn = document.getElementById('user-menu-btn');
+              var menu = document.getElementById('user-menu');
+              if (btn && !btn.contains(e.target) && menu && !menu.contains(e.target)) {
+                menu.classList.add('hidden');
+              }
+            });
+          </script>
           {% endif %}
         </div>
       </div>
