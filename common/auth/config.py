@@ -28,8 +28,8 @@ GOOGLE_REDIRECT_URI: str = f"{BASE_URL}/auth/google/callback"
 JWT_SECRET: str = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
 JWT_ALGORITHM: str = "HS256"
 
-ACCESS_TOKEN_EXPIRE_MINUTES: int = 60           # 1 hour
-REFRESH_TOKEN_EXPIRE_DAYS: int = 30             # 30 days
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour
+REFRESH_TOKEN_EXPIRE_DAYS: int = 30  # 30 days
 
 # Google OAuth endpoints
 GOOGLE_AUTH_URL: str = "https://accounts.google.com/o/oauth2/v2/auth"
